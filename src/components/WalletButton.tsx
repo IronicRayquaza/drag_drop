@@ -1,45 +1,99 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import ArweaveWalletBtn from '@ar-dacity/ardacity-wallet-btn';
-import './WalletButton.css';
+import styles from './WalletButton.module.css';
+
+declare global {
+  interface Window {
+    arweaveWallet?: {
+      connect: (permissions: string[], appInfo?: { name: string; logo: string }, gateway?: { host: string; port: number; protocol: string }) => Promise<void>;
+      disconnect: () => Promise<void>;
+      getActiveAddress: () => Promise<string>;
+    };
+  }
+}
 
 export interface WalletButtonProps {
-  className?: string;
-  style?: React.CSSProperties;
   variant?: 'default' | 'outline' | 'minimal';
   size?: 'sm' | 'md' | 'lg';
-  label?: {
-    connect: string;
-    disconnect: string;
-    connecting: string;
-  };
   showAddress?: boolean;
   addressDisplayLength?: number;
-  onConnect?: (address: string) => void;
-  onDisconnect?: () => void;
+  luaCode?: string;
+  aoProcessId?: string;
+  className?: string;
+  style?: React.CSSProperties;
 }
 
 const WalletButton: React.FC<WalletButtonProps> = ({
-  className = '',
-  style,
   variant = 'default',
   size = 'md',
-  label,
-  showAddress,
-  addressDisplayLength,
-  onConnect,
-  onDisconnect,
+  showAddress = false,
+  addressDisplayLength = 6,
+  luaCode,
+  aoProcessId,
+  className = '',
+  style = {},
 }) => {
+  useEffect(() => {
+    const initializeWallet = async () => {
+      if (window.arweaveWallet) {
+        try {
+          // Request the required permissions
+          await window.arweaveWallet.connect(['ACCESS_ADDRESS'], {
+            name: 'Wallet Builder',
+            logo: 'https://your-app-logo-url.com/logo.png'
+          });
+        } catch (error) {
+          console.error('Error initializing wallet:', error);
+        }
+      }
+    };
+
+    initializeWallet();
+  }, []);
+
+  const handleConnect = async (address: string) => {
+    if (aoProcessId && luaCode) {
+      try {
+        // Ensure we have the required permissions
+        if (window.arweaveWallet) {
+          await window.arweaveWallet.connect(['ACCESS_ADDRESS']);
+        }
+        
+        // Execute the onConnect handler if it exists in the Lua code
+        if (luaCode.includes('function onConnect')) {
+          console.log('Wallet connected:', address);
+          // You can add custom logic here for handling the connection
+        }
+      } catch (error) {
+        console.error('Error handling wallet connection:', error);
+      }
+    }
+  };
+
+  const handleDisconnect = async () => {
+    if (aoProcessId && luaCode) {
+      try {
+        // Execute the onDisconnect handler if it exists in the Lua code
+        if (luaCode.includes('function onDisconnect')) {
+          console.log('Wallet disconnected');
+          // You can add custom logic here for handling the disconnection
+        }
+      } catch (error) {
+        console.error('Error handling wallet disconnection:', error);
+      }
+    }
+  };
+
   return (
-    <div className="wallet-button-container" style={style}>
+    <div className={`${styles.container} ${className}`} style={style}>
       <ArweaveWalletBtn
-        className={className}
         variant={variant}
         size={size}
-        label={label}
         showAddress={showAddress}
         addressDisplayLength={addressDisplayLength}
-        onConnect={onConnect}
-        onDisconnect={onDisconnect}
+        onConnect={handleConnect}
+        onDisconnect={handleDisconnect}
+        className={styles.button}
       />
     </div>
   );

@@ -181,10 +181,20 @@ const availableComponents: Component[] = [
     props: {
       variant: 'default',
       size: 'md',
-      className: 'wallet-button',
-      style: {
-        margin: '1rem'
-      }
+      showAddress: false,
+      addressDisplayLength: 6,
+      luaCode: `-- Add your Lua handlers here
+-- Example:
+-- function onConnect(address)
+--   print('Connected:', address)
+-- end
+
+-- function onDisconnect()
+--   print('Disconnected')
+-- end`,
+      aoProcessId: '',
+      className: '',
+      style: {}
     }
   }
 ];

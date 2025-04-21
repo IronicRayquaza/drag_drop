@@ -12,6 +12,8 @@ import { atomDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import StarBorder from './StarBorder';
 import type { StarBorderProps } from './StarBorder';
 import WalletButton, { WalletButtonProps } from './WalletButton';
+import LuaIDE from './LuaIDE';
+import { CodeCell } from '@betteridea/codecell';
 
 interface BuilderProps {
   availableComponents: Component[];
@@ -46,7 +48,7 @@ const ComponentPreview: React.FC<{ component: Component }> = ({ component }) => 
       ctaButton: {
         text: 'Get Started',
         href: '#',
-        type: 'default',
+        buttonType: 'default',
         variant: 'primary',
         size: 'md'
       }
@@ -68,10 +70,22 @@ const ComponentPreview: React.FC<{ component: Component }> = ({ component }) => 
       speed: '6s',
     },
     wallet: {
-      variant: 'primary',
+      variant: 'default',
       size: 'md',
+      showAddress: false,
+      addressDisplayLength: 6,
+      luaCode: `-- Add your Lua handlers here
+-- Example:
+-- function onConnect(address)
+--   print('Connected:', address)
+-- end
+
+-- function onDisconnect()
+--   print('Disconnected')
+-- end`,
+      aoProcessId: '',
       className: '',
-      style: {},
+      style: {}
     },
   };
 
@@ -171,6 +185,35 @@ const PropertiesPanel: React.FC<{
                 />
               </div>
             )}
+            <div className="mt-6">
+              <h4 className="text-md font-medium text-gray-700 mb-2">Lua Handlers</h4>
+              <div className="border rounded-lg overflow-hidden">
+                <LuaIDE
+                  cellId={`wallet-${component.id}`}
+                  initialCode={component.props.luaCode || `-- Add your Lua handlers here
+-- Example:
+-- function onConnect(address)
+--   print('Connected:', address)
+-- end
+
+-- function onDisconnect()
+--   print('Disconnected')
+-- end`}
+                  onProcessId={(pid) => {
+                    console.log("Using process:", pid);
+                    onPropertyChange('aoProcessId', pid);
+                  }}
+                  onNewMessage={(msgs) => {
+                    console.log("New messages:", msgs);
+                    onPropertyChange('lastMessages', msgs);
+                  }}
+                  onInbox={(inbox) => {
+                    console.log("Got inbox:", inbox);
+                    onPropertyChange('inbox', inbox);
+                  }}
+                />
+              </div>
+            </div>
           </>
         )}
         {component.type === 'Header' && component.props.ctaButton && (
