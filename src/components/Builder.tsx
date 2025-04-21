@@ -11,12 +11,13 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { atomDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import StarBorder from './StarBorder';
 import type { StarBorderProps } from './StarBorder';
+import WalletButton, { WalletButtonProps } from './WalletButton';
 
 interface BuilderProps {
   availableComponents: Component[];
 }
 
-type ComponentProps = ButtonProps | NavbarProps | HeaderProps | NavbarDarkProps | GridDistortionProps | BottomNavbarProps | StarBorderProps;
+type ComponentProps = ButtonProps | NavbarProps | HeaderProps | NavbarDarkProps | GridDistortionProps | BottomNavbarProps | StarBorderProps | WalletButtonProps;
 
 const ComponentPreview: React.FC<{ component: Component }> = ({ component }) => {
   const defaultProps: Record<string, ComponentProps> = {
@@ -41,7 +42,14 @@ const ComponentPreview: React.FC<{ component: Component }> = ({ component }) => 
     Header: { 
       title: 'Preview Header',
       textColor: 'light',
-      height: 'md'
+      height: 'md',
+      ctaButton: {
+        text: 'Get Started',
+        href: '#',
+        type: 'default',
+        variant: 'primary',
+        size: 'md'
+      }
     },
     GridDistortion: { 
       imageSrc: 'https://images.unsplash.com/photo-1682687220063-4742bd7fd538?q=80&w=1000&auto=format&fit=crop',
@@ -58,6 +66,12 @@ const ComponentPreview: React.FC<{ component: Component }> = ({ component }) => 
       children: 'Star Border Button',
       color: '#007bff',
       speed: '6s',
+    },
+    wallet: {
+      variant: 'primary',
+      size: 'md',
+      className: '',
+      style: {},
     },
   };
 
@@ -78,13 +92,112 @@ const ComponentPreview: React.FC<{ component: Component }> = ({ component }) => 
       return <BottomNavbar {...(props as BottomNavbarProps)} />;
     case 'StarBorder':
       return <StarBorder {...(props as StarBorderProps)} />;
+    case 'wallet':
+      return <WalletButton {...(props as WalletButtonProps)} />;
     default:
       return <div>{component.name}</div>;
   }
 };
 
+const PropertiesPanel: React.FC<{
+  component: Component | null;
+  onPropertyChange: (key: string, value: any) => void;
+}> = ({ component, onPropertyChange }) => {
+  if (!component) {
+    return (
+      <div className="p-4 text-center text-gray-500">
+        Select a component to edit its properties
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4">
+      <h3 className="text-lg font-semibold mb-4">{component.name} Properties</h3>
+      <div className="space-y-4">
+        {component.type === 'wallet' && (
+          <>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Variant
+              </label>
+              <select
+                className="w-full p-2 border rounded-md"
+                value={component.props.variant || 'default'}
+                onChange={(e) => onPropertyChange('variant', e.target.value)}
+              >
+                <option value="default">Default</option>
+                <option value="outline">Outline</option>
+                <option value="minimal">Minimal</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Size
+              </label>
+              <select
+                className="w-full p-2 border rounded-md"
+                value={component.props.size || 'md'}
+                onChange={(e) => onPropertyChange('size', e.target.value)}
+              >
+                <option value="sm">Small</option>
+                <option value="md">Medium</option>
+                <option value="lg">Large</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Show Address
+              </label>
+              <input
+                type="checkbox"
+                checked={component.props.showAddress || false}
+                onChange={(e) => onPropertyChange('showAddress', e.target.checked)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+            </div>
+            {component.props.showAddress && (
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Address Display Length
+                </label>
+                <input
+                  type="number"
+                  value={component.props.addressDisplayLength || 6}
+                  onChange={(e) => onPropertyChange('addressDisplayLength', parseInt(e.target.value))}
+                  className="w-full p-2 border rounded-md"
+                  min="4"
+                  max="64"
+                />
+              </div>
+            )}
+          </>
+        )}
+        {component.type === 'Header' && component.props.ctaButton && (
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700">
+              Button Type
+            </label>
+            <select
+              className="w-full p-2 border rounded-md"
+              value={component.props.ctaButton.buttonType || 'default'}
+              onChange={(e) => onPropertyChange('ctaButton.buttonType', e.target.value)}
+            >
+              <option value="default">Default Button</option>
+              <option value="primary">Primary Button</option>
+              <option value="secondary">Secondary Button</option>
+              <option value="outline">Outline Button</option>
+              <option value="star">Star Border Button</option>
+            </select>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export const Builder: React.FC<BuilderProps> = ({ availableComponents }) => {
-  const { state, addComponent, removeComponent, selectComponent, moveComponent } = useBuilder();
+  const { state, addComponent, removeComponent, selectComponent, moveComponent, updateComponent } = useBuilder();
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
   const [draggedComponent, setDraggedComponent] = useState<Component | null>(null);
@@ -157,32 +270,98 @@ export const Builder: React.FC<BuilderProps> = ({ availableComponents }) => {
       .find((comp) => comp.id === selectedComponentId) || null;
   };
 
+  const handlePropertyChange = (componentId: string, key: string, value: any) => {
+    const component = state.dropZones
+      .flatMap((zone) => zone.children)
+      .find((comp) => comp.id === componentId);
+
+    if (!component) return;
+
+    const updatedProps = { ...component.props };
+    const keys = key.split('.');
+    let current = updatedProps;
+
+    for (let i = 0; i < keys.length - 1; i++) {
+      if (!current[keys[i]]) {
+        current[keys[i]] = {};
+      }
+      current = current[keys[i]];
+    }
+
+    current[keys[keys.length - 1]] = value;
+
+    // Special handling for button type changes
+    if (key === 'ctaButton.buttonType') {
+      if (value === 'star') {
+        updatedProps.ctaButton = {
+          ...updatedProps.ctaButton,
+          buttonType: 'star',
+          variant: 'primary'
+        };
+      } else if (value === 'default') {
+        updatedProps.ctaButton = {
+          ...updatedProps.ctaButton,
+          buttonType: 'default'
+        };
+      } else {
+        updatedProps.ctaButton = {
+          ...updatedProps.ctaButton,
+          buttonType: value,
+          variant: value
+        };
+      }
+    }
+
+    updateComponent(componentId, updatedProps);
+  };
+
+  const renderComponentCode = (component: Component) => {
+    switch (component.type) {
+      case 'wallet':
+        return `<WalletButton
+  variant="${component.props.variant || 'default'}"  // Toggle between: 'default', 'outline', 'minimal'
+  size="${component.props.size || 'md'}"  // Toggle between: 'sm', 'md', 'lg'
+  ${component.props.showAddress ? `showAddress={${component.props.showAddress}}` : ''}
+  ${component.props.addressDisplayLength ? `addressDisplayLength={${component.props.addressDisplayLength}}` : ''}
+  ${component.props.label ? `label={${JSON.stringify(component.props.label)}}` : ''}
+  ${component.props.onConnect ? `onConnect={(address) => console.log('Connected:', address)}` : ''}
+  ${component.props.onDisconnect ? `onDisconnect={() => console.log('Disconnected')}` : ''}
+  className="${component.props.className || ''}"
+  ${component.props.style ? `style={${JSON.stringify(component.props.style)}}` : ''}
+/>`;
+      default:
+        return getComponentCode(component);
+    }
+  };
+
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen overflow-hidden">
       {/* Components Panel */}
-      <div className="w-64 p-4 bg-gray-100">
-        <h2 className="text-lg font-semibold mb-4">Components</h2>
-        <div className="space-y-2">
-          {availableComponents.map((component) => (
-            <div
-              key={component.id}
-              draggable
-              onDragStart={(e) => handleDragStart(e, component)}
-              className="p-3 bg-white rounded-lg shadow-sm border border-gray-200 cursor-move hover:shadow-md hover:border-blue-500 transition-all"
-            >
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                <span className="font-medium text-gray-700">{component.name}</span>
+      <div className="w-64 flex-shrink-0 bg-gray-100 overflow-y-auto">
+        <div className="p-4">
+          <h2 className="text-lg font-semibold mb-4">Components</h2>
+          <div className="space-y-2">
+            {availableComponents.map((component) => (
+              <div
+                key={component.id}
+                draggable
+                onDragStart={(e) => handleDragStart(e, component)}
+                className="p-3 bg-white rounded-lg shadow-sm border border-gray-200 cursor-move hover:shadow-md hover:border-blue-500 transition-all"
+              >
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                  <span className="font-medium text-gray-700">{component.name}</span>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
 
       {/* Builder Canvas */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-h-0">
         {/* Toolbar */}
-        <div className="p-2 bg-gray-100 border-b flex items-center justify-between">
+        <div className="flex-shrink-0 p-2 bg-gray-100 border-b">
           <div className="flex items-center space-x-2">
             <button
               onClick={() => setIsPreviewMode(!isPreviewMode)}
@@ -197,7 +376,8 @@ export const Builder: React.FC<BuilderProps> = ({ availableComponents }) => {
           </div>
         </div>
 
-        <div className="flex-1 p-4 bg-white overflow-auto">
+        {/* Canvas Area */}
+        <div className="flex-1 overflow-y-auto p-4 bg-white">
           <div
             className={`min-h-full ${
               isPreviewMode ? '' : 'border-2 border-dashed border-gray-300'
@@ -208,7 +388,7 @@ export const Builder: React.FC<BuilderProps> = ({ availableComponents }) => {
             }}
             onDragOver={handleDragOver}
           >
-            <div className="w-full">
+            <div className="space-y-4">
               {state.dropZones.map((zone) => (
                 <div key={zone.id} className="w-full">
                   {zone.children.map((component) => (
@@ -316,57 +496,16 @@ export const Builder: React.FC<BuilderProps> = ({ availableComponents }) => {
         </div>
       </div>
 
-      {/* Code Preview Panel */}
-      <div className="w-96 p-4 bg-gray-100 border-l">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">Code Preview</h2>
-          {selectedComponentId && (
-            <button
-              onClick={() => setSelectedComponentId(null)}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-          )}
-        </div>
-        {selectedComponentId ? (
-          <div className="rounded-lg overflow-hidden bg-gray-900">
-            <div className="p-4">
-              <pre className="text-sm text-gray-300 font-mono whitespace-pre-wrap">
-                {getComponentCode(getSelectedComponent()!)}
-              </pre>
-            </div>
-          </div>
-        ) : (
-          <div className="text-center text-gray-500 py-8">
-            <svg
-              className="w-12 h-12 mx-auto mb-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
-              />
-            </svg>
-            <p>Click the code icon on any component to view its code</p>
-          </div>
-        )}
+      {/* Properties Panel */}
+      <div className="w-80 flex-shrink-0 border-l bg-white overflow-y-auto">
+        <PropertiesPanel
+          component={getSelectedComponent()}
+          onPropertyChange={(key, value) => {
+            if (selectedComponentId) {
+              handlePropertyChange(selectedComponentId, key, value);
+            }
+          }}
+        />
       </div>
     </div>
   );

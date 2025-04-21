@@ -1,0 +1,73 @@
+.wallet-button-container {
+  display: inline-block;
+  margin: 0.5rem;
+}
+
+/* Base styles for the wallet button */
+.wallet-button-container button {
+  transition: all 0.3s ease;
+  cursor: pointer;
+  font-weight: 500;
+  border-radius: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  outline: none;
+}
+
+/* Default variant */
+.wallet-button-container button[data-variant="default"] {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  color: white;
+}
+
+.wallet-button-container button[data-variant="default"]:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 8px rgba(79, 70, 229, 0.2);
+  background: linear-gradient(135deg, #4338ca, #6d28d9);
+}
+
+/* Outline variant */
+.wallet-button-container button[data-variant="outline"] {
+  background: transparent;
+  color: #4f46e5;
+  border: 2px solid #4f46e5;
+}
+
+.wallet-button-container button[data-variant="outline"]:hover {
+  transform: translateY(-2px);
+  background: rgba(79, 70, 229, 0.1);
+  box-shadow: 0 4px 6px rgba(79, 70, 229, 0.1);
+}
+
+/* Minimal variant */
+.wallet-button-container button[data-variant="minimal"] {
+  background: transparent;
+  color: #4f46e5;
+  border: none;
+  padding: 0.5rem 1rem;
+}
+
+.wallet-button-container button[data-variant="minimal"]:hover {
+  background: rgba(79, 70, 229, 0.1);
+}
+
+/* Size variants */
+.wallet-button-container button[data-size="sm"] {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+}
+
+.wallet-button-container button[data-size="lg"] {
+  padding: 1rem 2rem;
+  font-size: 1.125rem;
+}
+
+/* Connected state */
+.wallet-button-container button[data-connected="true"] {
+  background: #10b981;
+  color: white;
+}
+
+.wallet-button-container button[data-connected="true"]:hover {
+  background: #059669;
+} 

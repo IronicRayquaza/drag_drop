@@ -2,7 +2,8 @@
 
 import { Builder } from '@/components/Builder';
 import { Component } from '@/types/builder';
-// import ArweaveWalletBtn from '@ar-dacity/ardacity-wallet-btn';
+import ArweaveWalletBtn from '@ar-dacity/ardacity-wallet-btn';
+import WalletButton from '@/components/WalletButton';
 
 const availableComponents: Component[] = [
   {
@@ -57,6 +58,67 @@ const availableComponents: Component[] = [
       ctaButton: {
         text: 'Get Started',
         href: '#',
+        type: 'star',
+        variant: 'primary',
+        size: 'lg'
+      },
+    },
+  },
+  {
+    id: 'header-hero-2',
+    name: 'Hero Header (Primary Button)',
+    type: 'Header',
+    props: {
+      title: 'Modern Design',
+      subtitle: 'Build beautiful websites',
+      height: 'lg',
+      textColor: 'light',
+      backgroundImage: 'https://images.unsplash.com/photo-1497366216548-37526022997c',
+      ctaButton: {
+        text: 'Explore Now',
+        href: '#',
+        type: 'primary',
+        variant: 'primary',
+        size: 'lg'
+      },
+    },
+  },
+  {
+    id: 'header-hero-3',
+    name: 'Hero Header (Outline Button)',
+    type: 'Header',
+    props: {
+      title: 'Creative Solutions',
+      subtitle: 'Design without limits',
+      height: 'lg',
+      textColor: 'light',
+      backgroundImage: 'https://images.unsplash.com/photo-1497366216548-37526022997c',
+      ctaButton: {
+        text: 'Learn More',
+        href: '#',
+        type: 'outline',
+        variant: 'outline',
+        size: 'lg'
+      },
+    },
+  },
+  {
+    id: 'header-hero-4',
+    name: 'Hero Header (Dark Theme)',
+    type: 'Header',
+    props: {
+      title: 'Dark Mode Ready',
+      subtitle: 'Perfect for any theme',
+      height: 'lg',
+      textColor: 'dark',
+      backgroundImage: 'https://images.unsplash.com/photo-1497366216548-37526022997c',
+      overlayColor: 'rgba(255, 255, 255, 0.8)',
+      ctaButton: {
+        text: 'Try Dark Mode',
+        href: '#',
+        type: 'primary',
+        variant: 'primary',
+        size: 'lg'
       },
     },
   },
@@ -112,12 +174,25 @@ const availableComponents: Component[] = [
       speed: '6s',
     },
   },
+  {
+    id: 'wallet-button-1',
+    name: 'Wallet Button',
+    type: 'wallet',
+    props: {
+      variant: 'default',
+      size: 'md',
+      className: 'wallet-button',
+      style: {
+        margin: '1rem'
+      }
+    }
+  }
 ];
 
 export default function Home() {
   return (
     <main className="min-h-screen">
-      {/* <ArweaveWalletBtn /> */}
+      <ArweaveWalletBtn />
       <Builder availableComponents={availableComponents} />
     </main>
   );

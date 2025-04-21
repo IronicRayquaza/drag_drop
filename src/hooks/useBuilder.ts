@@ -115,6 +115,24 @@ export const useBuilder = () => {
     });
   }, []);
 
+  const updateComponent = useCallback((componentId: string, updatedProps: Record<string, any>) => {
+    setState((prevState) => {
+      const updatedDropZones = prevState.dropZones.map((zone) => ({
+        ...zone,
+        children: zone.children.map((component) =>
+          component.id === componentId
+            ? { ...component, props: { ...component.props, ...updatedProps } }
+            : component
+        ),
+      }));
+
+      return {
+        ...prevState,
+        dropZones: updatedDropZones,
+      };
+    });
+  }, []);
+
   return {
     state,
     addComponent,
@@ -122,5 +140,6 @@ export const useBuilder = () => {
     selectComponent,
     reorderComponents,
     moveComponent,
+    updateComponent,
   };
 }; 

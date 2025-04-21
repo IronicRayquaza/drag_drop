@@ -1,4 +1,6 @@
 import React from 'react';
+import { Button } from './Button';
+import StarBorder from './StarBorder';
 
 export interface HeaderProps {
   title: string;
@@ -10,6 +12,9 @@ export interface HeaderProps {
   ctaButton?: {
     text: string;
     href: string;
+    buttonType?: 'default' | 'primary' | 'secondary' | 'outline' | 'star';
+    variant?: 'primary' | 'secondary' | 'outline';
+    size?: 'sm' | 'md' | 'lg';
   };
 }
 
@@ -33,6 +38,45 @@ export const Header: React.FC<HeaderProps> = ({
     dark: 'text-gray-900',
   };
 
+  const renderButton = () => {
+    if (!ctaButton) return null;
+
+    switch (ctaButton.buttonType) {
+      case 'star':
+        return (
+          <StarBorder
+            color={textColor === 'light' ? 'white' : '#007bff'}
+            speed="6s"
+          >
+            <a href={ctaButton.href} className="text-inherit">
+              {ctaButton.text}
+            </a>
+          </StarBorder>
+        );
+      case 'primary':
+      case 'secondary':
+      case 'outline':
+        return (
+          <a href={ctaButton.href}>
+            <Button
+              text={ctaButton.text}
+              variant={ctaButton.variant || 'primary'}
+              size={ctaButton.size || 'md'}
+            />
+          </a>
+        );
+      default:
+        return (
+          <a
+            href={ctaButton.href}
+            className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            {ctaButton.text}
+          </a>
+        );
+    }
+  };
+
   return (
     <header
       className={`relative ${heightStyles[height]} flex items-center justify-center`}
@@ -53,14 +97,7 @@ export const Header: React.FC<HeaderProps> = ({
             {subtitle}
           </p>
         )}
-        {ctaButton && (
-          <a
-            href={ctaButton.href}
-            className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            {ctaButton.text}
-          </a>
-        )}
+        {ctaButton && renderButton()}
       </div>
     </header>
   );
