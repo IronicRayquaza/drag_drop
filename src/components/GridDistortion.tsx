@@ -2,6 +2,15 @@ import { useRef, useEffect } from 'react';
 import * as THREE from 'three';
 import './GridDistortion.css';
 
+export interface GridDistortionProps {
+  imageSrc: string;
+  grid?: number;
+  mouse?: number;
+  strength?: number;
+  relaxation?: number;
+  className?: string;
+}
+
 const vertexShader = `
 varying vec2 vUv;
 void main() {
@@ -13,23 +22,37 @@ const fragmentShader = `
 uniform sampler2D uTexture;
 uniform vec2 mouse;
 uniform float time;
+uniform float grid;
+uniform float strength;
+uniform float relaxation;
 varying vec2 vUv;
 
 void main() {
   vec2 uv = vUv;
-  float distortion = sin(time + uv.x * 10.0) * 0.02;
-  uv.x += distortion;
-  uv.y += distortion;
+  
+  // Calculate grid distortion
+  float gridSize = 1.0 / grid;
+  vec2 gridPos = floor(uv * grid) * gridSize;
+  vec2 gridOffset = uv - gridPos;
+  
+  // Apply mouse-based distortion
+  vec2 mouseOffset = (mouse - 0.5) * 2.0;
+  float distortion = sin(time + uv.x * 10.0) * strength;
+  
+  // Combine distortions with relaxation
+  uv.x += distortion * (1.0 - relaxation) + mouseOffset.x * strength;
+  uv.y += distortion * (1.0 - relaxation) + mouseOffset.y * strength;
+  
+  // Sample texture with distorted coordinates
   gl_FragColor = texture2D(uTexture, uv);
 }`;
 
-export interface GridDistortionProps {
-  imageSrc: string;
-  className?: string;
-}
-
 const GridDistortion: React.FC<GridDistortionProps> = ({
   imageSrc,
+  grid = 15,
+  mouse = 0.1,
+  strength = 0.15,
+  relaxation = 0.9,
   className = ''
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -37,6 +60,7 @@ const GridDistortion: React.FC<GridDistortionProps> = ({
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.OrthographicCamera | null>(null);
   const textureRef = useRef<THREE.Texture | null>(null);
+  const materialRef = useRef<THREE.ShaderMaterial | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -67,11 +91,15 @@ const GridDistortion: React.FC<GridDistortionProps> = ({
         uniforms: {
           uTexture: { value: texture },
           mouse: { value: new THREE.Vector2(0, 0) },
-          time: { value: 0 }
+          time: { value: 0 },
+          grid: { value: grid },
+          strength: { value: strength },
+          relaxation: { value: relaxation }
         },
         vertexShader,
         fragmentShader
       });
+      materialRef.current = material;
 
       const geometry = new THREE.PlaneGeometry(2, 2);
       const mesh = new THREE.Mesh(geometry, material);
@@ -122,6 +150,10 @@ const GridDistortion: React.FC<GridDistortionProps> = ({
         textureRef.current.dispose();
         textureRef.current = null;
       }
+      if (materialRef.current) {
+        materialRef.current.dispose();
+        materialRef.current = null;
+      }
       if (sceneRef.current) {
         sceneRef.current.children.forEach(child => {
           if (child instanceof THREE.Mesh) {
@@ -137,9 +169,23 @@ const GridDistortion: React.FC<GridDistortionProps> = ({
         cameraRef.current = null;
       }
     };
-  }, [imageSrc]);
+  }, [imageSrc, grid, strength, relaxation]);
 
-  return <div ref={containerRef} className={`distortion-container ${className}`} />;
+  return (
+    <div 
+      ref={containerRef} 
+      className={`grid-distortion-container ${className}`}
+      style={{
+        width: '100%',
+        height: '100%',
+        minHeight: '300px',
+        position: 'relative',
+        overflow: 'hidden',
+        borderRadius: '8px',
+        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+      }}
+    />
+  );
 };
 
 export default GridDistortion; 

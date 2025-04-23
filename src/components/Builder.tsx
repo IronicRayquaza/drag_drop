@@ -13,15 +13,80 @@ import StarBorder from './StarBorder';
 import type { StarBorderProps } from './StarBorder';
 import WalletButton, { WalletButtonProps } from './WalletButton';
 import LuaIDE from './LuaIDE';
-import { CodeCell } from '@betteridea/codecell';
+import ArDacityNavBar from '@ar-dacity/ardacity-navbar';
+import ArweaveForm from './ArweaveForm';
+import MessageSignerForm from './MessageSignerForm';
+import ArweaveNFT from './ArweaveNFT';
+import CredentialsNavbar from './CredentialsNavbar';
+import type { CredentialsNavbarProps } from './CredentialsNavbar';
+import DecryptedText, { DecryptedTextProps } from './DecryptedText';
+import FlowingMenu, { FlowingMenuProps } from './FlowingMenu';
+import { downloadProject } from '@/utils/projectGenerator';
+// import { ArdacityHeaderOne } from '@ar-dacity/ardacity-header-one';
+// import { ArdacityHeaderThree } from '@ar-dacity/ardacity-header-three';
 
 interface BuilderProps {
   availableComponents: Component[];
 }
 
-type ComponentProps = ButtonProps | NavbarProps | HeaderProps | NavbarDarkProps | GridDistortionProps | BottomNavbarProps | StarBorderProps | WalletButtonProps;
+type ComponentProps = ButtonProps | NavbarProps | HeaderProps | NavbarDarkProps | GridDistortionProps | BottomNavbarProps | StarBorderProps | WalletButtonProps | CredentialsNavbarProps | DecryptedTextProps | FlowingMenuProps;
 
-const ComponentPreview: React.FC<{ component: Component }> = ({ component }) => {
+interface ComponentPreviewProps {
+  component: Component;
+  onRemove: (id: string) => void;
+  onMoveUp: (id: string) => void;
+  onMoveDown: (id: string) => void;
+  onShowCode: (id: string) => void;
+  selectedComponentId: string | null;
+}
+
+const ComponentPreview: React.FC<ComponentPreviewProps> = ({ 
+  component, 
+  onRemove, 
+  onMoveUp, 
+  onMoveDown, 
+  onShowCode,
+  selectedComponentId 
+}) => {
+  const [showFullCode, setShowFullCode] = useState(false);
+
+  const handleRemove = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onRemove(component.id);
+  };
+
+  const handleMoveUp = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onMoveUp(component.id);
+  };
+
+  const handleMoveDown = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onMoveDown(component.id);
+  };
+
+  const handleShowCode = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onShowCode(component.id);
+  };
+
+  const getFullComponentCode = (component: Component) => {
+    const props = { ...component.props };
+    const propString = Object.entries(props)
+      .map(([key, value]) => {
+        if (typeof value === 'string') {
+          return `  ${key}="${value}"`;
+        }
+        if (typeof value === 'object') {
+          return `  ${key}={${JSON.stringify(value, null, 2)}}`;
+        }
+        return `  ${key}={${value}}`;
+      })
+      .join('\n');
+
+    return `import ${component.type} from './components/${component.type}';\n\nconst MyComponent = () => {\n  return (\n    <${component.type}\n${propString}\n    />\n  );\n};\n\nexport default MyComponent;`;
+  };
+
   const defaultProps: Record<string, ComponentProps> = {
     Button: { text: 'Preview Button', variant: 'primary', size: 'md' },
     Navbar: { 
@@ -87,36 +152,346 @@ const ComponentPreview: React.FC<{ component: Component }> = ({ component }) => 
       className: '',
       style: {}
     },
+    'ardacity-navbar': {
+      brand: 'Your Brand',
+      links: [
+        { label: 'Home', href: '/', isActive: true },
+        { label: 'About', href: '/about' }
+      ],
+      showWalletButton: true,
+      variant: 'default',
+      position: 'sticky'
+    },
+    'arweave-form': {
+      title: 'Create Arweave Transaction',
+      description: 'Submit transactions with Lua handlers',
+      initialLuaCode: `-- Add your Lua handlers here
+function onConnect(address)
+  print('Connected:', address)
+end
+
+function onDisconnect()
+  print('Disconnected')
+end
+
+function onTransaction(tx)
+  print('Transaction:', tx)
+end`,
+      onSubmit: (data) => {
+        console.log('Form submitted:', data);
+      }
+    },
+    'message-signer': {
+      title: 'Sign Message with Lua',
+      description: 'Sign messages using Lua handlers and Arweave wallet',
+      initialLuaCode: `-- Message signing handler
+function signMessage(message)
+  -- Get the wallet address
+  local address = ao.getActiveAddress()
+  
+  -- Create a signature
+  local signature = ao.signMessage(message)
+  
+  -- Return the signature
+  return {
+    address = address,
+    signature = signature
+  }
+end
+
+-- Example usage:
+-- local result = signMessage("Hello, Arweave!")
+-- print("Address:", result.address)
+-- print("Signature:", result.signature)`,
+      onSign: (data: { message: string; signature: string; luaCode: string }) => {
+        console.log('Message signed:', data);
+      }
+    },
+    nft: {
+      title: 'My Arweave NFT',
+      description: 'View and transfer your Arweave NFT',
+      imageUrl: 'https://arweave.net/your-nft-image',
+      tokenId: 'your-token-id',
+      owner: 'your-wallet-address',
+      initialLuaCode: `-- NFT transfer handler
+function transferNFT(to, tokenId)
+  -- Get the current owner
+  local currentOwner = ao.getActiveAddress()
+  
+  -- Check if the sender is the owner
+  if currentOwner ~= owner then
+    return {
+      success = false,
+      error = "Only the owner can transfer this NFT"
+    }
+  end
+  
+  -- Transfer the NFT
+  local result = ao.transferNFT(to, tokenId)
+  
+  -- Return the result
+  return {
+    success = true,
+    transactionId = result.id
+  }
+end
+
+-- Example usage:
+-- local result = transferNFT("recipient-address", "token-id")
+-- print("Transfer result:", result)`,
+      onTransfer: (data) => {
+        console.log('NFT Transfer:', data);
+      }
+    },
+    'credentials-navbar': {
+      activeTab: 'home',
+      onTabChange: (tab: string) => console.log('Tab changed:', tab),
+      socialLinks: {
+        instagram: 'https://instagram.com/your-username',
+        twitter: 'https://twitter.com/your-username',
+        facebook: 'https://facebook.com/your-username',
+        linkedin: 'https://linkedin.com/in/your-username',
+        github: 'https://github.com/your-username',
+        discord: 'https://discord.gg/your-server',
+        telegram: 'https://t.me/your-username'
+      }
+    },
+    DecryptedText: {
+      text: 'Decrypted Text',
+      speed: 50,
+      maxIterations: 10,
+      sequential: false,
+      revealDirection: 'start',
+      useOriginalCharsOnly: false,
+      characters: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!@#$%^&*()_+',
+      className: 'text-blue-500',
+      parentClassName: 'text-2xl font-bold',
+      encryptedClassName: 'text-gray-400',
+      animateOn: 'hover'
+    },
+    FlowingMenu: {
+      items: [
+        {
+          link: '#',
+          text: 'Home',
+          image: 'https://images.unsplash.com/photo-1682687220063-4742bd7fd538?q=80&w=1000&auto=format&fit=crop'
+        },
+        {
+          link: '#',
+          text: 'About',
+          image: 'https://images.unsplash.com/photo-1682687220063-4742bd7fd538?q=80&w=1000&auto=format&fit=crop'
+        },
+        {
+          link: '#',
+          text: 'Contact',
+          image: 'https://images.unsplash.com/photo-1682687220063-4742bd7fd538?q=80&w=1000&auto=format&fit=crop'
+        }
+      ],
+      className: 'h-screen'
+    },
   };
 
   const props = { ...defaultProps[component.type], ...component.props } as ComponentProps;
 
-  switch (component.type) {
-    case 'Button':
-      return <Button {...(props as ButtonProps)} />;
-    case 'Navbar':
-      return <Navbar {...(props as NavbarProps)} />;
-    case 'NavbarDark':
-      return <NavbarDark {...(props as NavbarDarkProps)} />;
-    case 'Header':
-      return <Header {...(props as HeaderProps)} />;
-    case 'GridDistortion':
-      return <GridDistortion {...(props as GridDistortionProps)} />;
-    case 'BottomNavbar':
-      return <BottomNavbar {...(props as BottomNavbarProps)} />;
-    case 'StarBorder':
-      return <StarBorder {...(props as StarBorderProps)} />;
-    case 'wallet':
-      return <WalletButton {...(props as WalletButtonProps)} />;
-    default:
-      return <div>{component.name}</div>;
-  }
+  const renderComponent = () => {
+    switch (component.type) {
+      case 'Button':
+        return <Button {...(props as ButtonProps)} />;
+      case 'Navbar':
+        return <Navbar {...(props as NavbarProps)} />;
+      case 'NavbarDark':
+        return <NavbarDark {...(props as NavbarDarkProps)} />;
+      case 'Header':
+        return <Header {...(props as HeaderProps)} />;
+      case 'GridDistortion':
+        return <GridDistortion {...(props as GridDistortionProps)} />;
+      case 'BottomNavbar':
+        return <BottomNavbar {...(props as BottomNavbarProps)} />;
+      case 'StarBorder':
+        return <StarBorder {...(props as StarBorderProps)} />;
+      case 'wallet':
+        return <WalletButton {...(props as WalletButtonProps)} />;
+      case 'ardacity-navbar':
+        return <ArDacityNavBar {...(props as any)} />;
+      case 'arweave-form':
+        return <ArweaveForm {...(props as any)} />;
+      case 'message-signer':
+        return <MessageSignerForm {...(props as any)} />;
+      case 'nft':
+        return (
+          <ArweaveNFT
+            {...props}
+            onTransfer={(data) => {
+              console.log('NFT Transfer:', data);
+              if (props.onTransfer) {
+                props.onTransfer(data);
+              }
+            }}
+          />
+        );
+      case 'credentials-navbar':
+        return <CredentialsNavbar {...(props as CredentialsNavbarProps)} />;
+      case 'DecryptedText':
+        return <DecryptedText {...(props as DecryptedTextProps)} />;
+      case 'FlowingMenu':
+        return <FlowingMenu {...(props as FlowingMenuProps)} />;
+      default:
+        return <div>{component.name}</div>;
+    }
+  };
+
+  return (
+    <div className="relative w-full group">
+      <div className="absolute right-2 top-2 z-[100]">
+        <div className="bg-white/90 backdrop-blur-sm rounded-full shadow-lg p-1 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={handleRemove}
+            className="p-1.5 text-red-500 rounded-full hover:bg-red-50"
+            title="Delete component"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
+            </svg>
+          </button>
+          <button
+            onClick={handleMoveUp}
+            className="p-1.5 text-gray-700 rounded-full hover:bg-gray-50"
+            title="Move up"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M5 15l7-7 7 7"
+              />
+            </svg>
+          </button>
+          <button
+            onClick={handleMoveDown}
+            className="p-1.5 text-gray-700 rounded-full hover:bg-gray-50"
+            title="Move down"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
+          </button>
+          <button
+            onClick={handleShowCode}
+            className={`p-1.5 rounded-full ${
+              selectedComponentId === component.id
+                ? 'bg-blue-50 text-blue-500'
+                : 'text-gray-700 hover:bg-gray-50'
+            }`}
+            title="Show code"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
+              />
+            </svg>
+          </button>
+          <button
+            onClick={() => setShowFullCode(!showFullCode)}
+            className={`p-1.5 rounded-full ${
+              showFullCode
+                ? 'bg-blue-50 text-blue-500'
+                : 'text-gray-700 hover:bg-gray-50'
+            }`}
+            title="View full code"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+      {showFullCode && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-gray-900 rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium text-white">Full Component Code</h3>
+              <button
+                onClick={() => setShowFullCode(false)}
+                className="text-gray-400 hover:text-white"
+              >
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+            <pre className="bg-gray-800 rounded-lg p-4 overflow-x-auto">
+              <code className="text-sm text-gray-100">{getFullComponentCode(component)}</code>
+            </pre>
+          </div>
+        </div>
+      )}
+      {renderComponent()}
+    </div>
+  );
 };
 
 const PropertiesPanel: React.FC<{
   component: Component | null;
   onPropertyChange: (key: string, value: any) => void;
-}> = ({ component, onPropertyChange }) => {
+  onRemove?: (id: string) => void;
+  onMoveUp?: (id: string) => void;
+  onMoveDown?: (id: string) => void;
+  onShowCode?: (id: string) => void;
+}> = ({ component, onPropertyChange, onRemove, onMoveUp, onMoveDown, onShowCode }) => {
   if (!component) {
     return (
       <div className="p-4 text-center text-gray-500">
@@ -125,11 +500,10 @@ const PropertiesPanel: React.FC<{
     );
   }
 
-  return (
-    <div className="p-4">
-      <h3 className="text-lg font-semibold mb-4">{component.name} Properties</h3>
-      <div className="space-y-4">
-        {component.type === 'wallet' && (
+  const renderProperties = () => {
+    switch (component.type) {
+      case 'wallet':
+        return (
           <>
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">
@@ -215,25 +589,752 @@ const PropertiesPanel: React.FC<{
               </div>
             </div>
           </>
-        )}
-        {component.type === 'Header' && component.props.ctaButton && (
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">
-              Button Type
-            </label>
-            <select
-              className="w-full p-2 border rounded-md"
-              value={component.props.ctaButton.buttonType || 'default'}
-              onChange={(e) => onPropertyChange('ctaButton.buttonType', e.target.value)}
+        );
+      case 'Header':
+        if (component.props.ctaButton) {
+          return (
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Button Type
+              </label>
+              <select
+                className="w-full p-2 border rounded-md"
+                value={component.props.ctaButton.buttonType || 'default'}
+                onChange={(e) => onPropertyChange('ctaButton.buttonType', e.target.value)}
+              >
+                <option value="default">Default Button</option>
+                <option value="primary">Primary Button</option>
+                <option value="secondary">Secondary Button</option>
+                <option value="outline">Outline Button</option>
+                <option value="star">Star Border Button</option>
+              </select>
+            </div>
+          );
+        }
+        return null;
+      case 'ardacity-navbar':
+        return (
+          <>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Brand
+              </label>
+              <input
+                type="text"
+                value={component.props.brand || ''}
+                onChange={(e) => onPropertyChange('brand', e.target.value)}
+                className="w-full p-2 border rounded-md"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Variant
+              </label>
+              <select
+                className="w-full p-2 border rounded-md"
+                value={component.props.variant || 'default'}
+                onChange={(e) => onPropertyChange('variant', e.target.value)}
+              >
+                <option value="default">Default</option>
+                <option value="minimal">Minimal</option>
+                <option value="transparent">Transparent</option>
+                <option value="accent">Accent</option>
+                <option value="glass">Glass</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Position
+              </label>
+              <select
+                className="w-full p-2 border rounded-md"
+                value={component.props.position || 'static'}
+                onChange={(e) => onPropertyChange('position', e.target.value)}
+              >
+                <option value="static">Static</option>
+                <option value="sticky">Sticky</option>
+                <option value="fixed">Fixed</option>
+              </select>
+            </div>
+          </>
+        );
+      case 'ardacity-header-one':
+        return (
+          <>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Name
+              </label>
+              <input
+                type="text"
+                value={component.props.name || ''}
+                onChange={(e) => onPropertyChange('name', e.target.value)}
+                className="w-full p-2 border rounded-md"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Title
+              </label>
+              <input
+                type="text"
+                value={component.props.title || ''}
+                onChange={(e) => onPropertyChange('title', e.target.value)}
+                className="w-full p-2 border rounded-md"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Images (comma-separated URLs)
+              </label>
+              <input
+                type="text"
+                value={component.props.images?.join(',') || ''}
+                onChange={(e) => onPropertyChange('images', e.target.value.split(',').map(url => url.trim()))}
+                className="w-full p-2 border rounded-md"
+                placeholder="https://example.com/image1.jpg, https://example.com/image2.jpg"
+              />
+            </div>
+          </>
+        );
+      case 'ardacity-header-three':
+        return (
+          <>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Image Source
+              </label>
+              <input
+                type="text"
+                value={component.props.imageSrc || ''}
+                onChange={(e) => onPropertyChange('imageSrc', e.target.value)}
+                className="w-full p-2 border rounded-md"
+                placeholder="https://example.com/image.jpg"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Title
+              </label>
+              <input
+                type="text"
+                value={component.props.title || ''}
+                onChange={(e) => onPropertyChange('title', e.target.value)}
+                className="w-full p-2 border rounded-md"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Grid
+              </label>
+              <input
+                type="number"
+                value={component.props.grid || 10}
+                onChange={(e) => onPropertyChange('grid', parseInt(e.target.value))}
+                className="w-full p-2 border rounded-md"
+                min="1"
+                max="20"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Mouse Sensitivity
+              </label>
+              <input
+                type="number"
+                value={component.props.mouse || 0.5}
+                onChange={(e) => onPropertyChange('mouse', parseFloat(e.target.value))}
+                className="w-full p-2 border rounded-md"
+                min="0"
+                max="1"
+                step="0.1"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Strength
+              </label>
+              <input
+                type="number"
+                value={component.props.strength || 0.5}
+                onChange={(e) => onPropertyChange('strength', parseFloat(e.target.value))}
+                className="w-full p-2 border rounded-md"
+                min="0"
+                max="1"
+                step="0.1"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Relaxation
+              </label>
+              <input
+                type="number"
+                value={component.props.relaxation || 0.5}
+                onChange={(e) => onPropertyChange('relaxation', parseFloat(e.target.value))}
+                className="w-full p-2 border rounded-md"
+                min="0"
+                max="1"
+                step="0.1"
+              />
+            </div>
+          </>
+        );
+      case 'arweave-form':
+        return (
+          <>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Title
+              </label>
+              <input
+                type="text"
+                value={component.props.title || ''}
+                onChange={(e) => onPropertyChange('title', e.target.value)}
+                className="w-full p-2 border rounded-md"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Description
+              </label>
+              <textarea
+                value={component.props.description || ''}
+                onChange={(e) => onPropertyChange('description', e.target.value)}
+                className="w-full p-2 border rounded-md"
+                rows={3}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Initial Lua Code
+              </label>
+              <textarea
+                value={component.props.initialLuaCode || ''}
+                onChange={(e) => onPropertyChange('initialLuaCode', e.target.value)}
+                className="w-full p-2 border rounded-md font-mono"
+                rows={10}
+              />
+            </div>
+          </>
+        );
+      case 'message-signer':
+        return (
+          <>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Title
+              </label>
+              <input
+                type="text"
+                value={component.props.title || ''}
+                onChange={(e) => onPropertyChange('title', e.target.value)}
+                className="w-full p-2 border rounded-md"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Description
+              </label>
+              <textarea
+                value={component.props.description || ''}
+                onChange={(e) => onPropertyChange('description', e.target.value)}
+                className="w-full p-2 border rounded-md"
+                rows={3}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Initial Lua Code
+              </label>
+              <textarea
+                value={component.props.initialLuaCode || ''}
+                onChange={(e) => onPropertyChange('initialLuaCode', e.target.value)}
+                className="w-full p-2 border rounded-md font-mono"
+                rows={10}
+              />
+            </div>
+          </>
+        );
+      case 'nft':
+        return (
+          <>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700">Title</label>
+              <input
+                type="text"
+                value={component.props.title}
+                onChange={(e) => onPropertyChange('title', e.target.value)}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              />
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700">Description</label>
+              <input
+                type="text"
+                value={component.props.description}
+                onChange={(e) => onPropertyChange('description', e.target.value)}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              />
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700">Image URL</label>
+              <input
+                type="text"
+                value={component.props.imageUrl}
+                onChange={(e) => onPropertyChange('imageUrl', e.target.value)}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              />
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700">Token ID</label>
+              <input
+                type="text"
+                value={component.props.tokenId}
+                onChange={(e) => onPropertyChange('tokenId', e.target.value)}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              />
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700">Owner</label>
+              <input
+                type="text"
+                value={component.props.owner}
+                onChange={(e) => onPropertyChange('owner', e.target.value)}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              />
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700">Lua Code</label>
+              <textarea
+                value={component.props.initialLuaCode}
+                onChange={(e) => onPropertyChange('initialLuaCode', e.target.value)}
+                rows={10}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              />
+            </div>
+          </>
+        );
+      case 'credentials-navbar':
+        return (
+          <>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Active Tab
+              </label>
+              <select
+                className="w-full p-2 border rounded-md"
+                value={component.props.activeTab || 'home'}
+                onChange={(e) => onPropertyChange('activeTab', e.target.value)}
+              >
+                <option value="home">Home</option>
+              </select>
+            </div>
+            <div className="mt-4">
+              <h4 className="text-sm font-medium text-gray-700 mb-2">Social Media Links</h4>
+              <div className="space-y-2">
+                <div>
+                  <label className="block text-sm text-gray-600">Instagram</label>
+                  <input
+                    type="text"
+                    className="w-full p-2 border rounded-md"
+                    value={component.props.socialLinks?.instagram || ''}
+                    onChange={(e) => onPropertyChange('socialLinks.instagram', e.target.value)}
+                    placeholder="https://instagram.com/your-username"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-600">Twitter</label>
+                  <input
+                    type="text"
+                    className="w-full p-2 border rounded-md"
+                    value={component.props.socialLinks?.twitter || ''}
+                    onChange={(e) => onPropertyChange('socialLinks.twitter', e.target.value)}
+                    placeholder="https://twitter.com/your-username"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-600">Facebook</label>
+                  <input
+                    type="text"
+                    className="w-full p-2 border rounded-md"
+                    value={component.props.socialLinks?.facebook || ''}
+                    onChange={(e) => onPropertyChange('socialLinks.facebook', e.target.value)}
+                    placeholder="https://facebook.com/your-username"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-600">LinkedIn</label>
+                  <input
+                    type="text"
+                    className="w-full p-2 border rounded-md"
+                    value={component.props.socialLinks?.linkedin || ''}
+                    onChange={(e) => onPropertyChange('socialLinks.linkedin', e.target.value)}
+                    placeholder="https://linkedin.com/in/your-username"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-600">GitHub</label>
+                  <input
+                    type="text"
+                    className="w-full p-2 border rounded-md"
+                    value={component.props.socialLinks?.github || ''}
+                    onChange={(e) => onPropertyChange('socialLinks.github', e.target.value)}
+                    placeholder="https://github.com/your-username"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-600">Discord</label>
+                  <input
+                    type="text"
+                    className="w-full p-2 border rounded-md"
+                    value={component.props.socialLinks?.discord || ''}
+                    onChange={(e) => onPropertyChange('socialLinks.discord', e.target.value)}
+                    placeholder="https://discord.gg/your-server"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-600">Telegram</label>
+                  <input
+                    type="text"
+                    className="w-full p-2 border rounded-md"
+                    value={component.props.socialLinks?.telegram || ''}
+                    onChange={(e) => onPropertyChange('socialLinks.telegram', e.target.value)}
+                    placeholder="https://t.me/your-username"
+                  />
+                </div>
+              </div>
+            </div>
+          </>
+        );
+      case 'DecryptedText':
+        return (
+          <>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Text
+              </label>
+              <input
+                type="text"
+                value={component.props.text || ''}
+                onChange={(e) => onPropertyChange('text', e.target.value)}
+                className="w-full p-2 border rounded-md"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Speed (ms)
+              </label>
+              <input
+                type="number"
+                value={component.props.speed || 50}
+                onChange={(e) => onPropertyChange('speed', parseInt(e.target.value))}
+                className="w-full p-2 border rounded-md"
+                min="10"
+                max="1000"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Max Iterations
+              </label>
+              <input
+                type="number"
+                value={component.props.maxIterations || 10}
+                onChange={(e) => onPropertyChange('maxIterations', parseInt(e.target.value))}
+                className="w-full p-2 border rounded-md"
+                min="1"
+                max="50"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Sequential
+              </label>
+              <input
+                type="checkbox"
+                checked={component.props.sequential || false}
+                onChange={(e) => onPropertyChange('sequential', e.target.checked)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Reveal Direction
+              </label>
+              <select
+                value={component.props.revealDirection || 'start'}
+                onChange={(e) => onPropertyChange('revealDirection', e.target.value)}
+                className="w-full p-2 border rounded-md"
+              >
+                <option value="start">Start</option>
+                <option value="end">End</option>
+                <option value="center">Center</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Use Original Characters Only
+              </label>
+              <input
+                type="checkbox"
+                checked={component.props.useOriginalCharsOnly || false}
+                onChange={(e) => onPropertyChange('useOriginalCharsOnly', e.target.checked)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Characters
+              </label>
+              <input
+                type="text"
+                value={component.props.characters || 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!@#$%^&*()_+'}
+                onChange={(e) => onPropertyChange('characters', e.target.value)}
+                className="w-full p-2 border rounded-md"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Class Name
+              </label>
+              <input
+                type="text"
+                value={component.props.className || ''}
+                onChange={(e) => onPropertyChange('className', e.target.value)}
+                className="w-full p-2 border rounded-md"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Parent Class Name
+              </label>
+              <input
+                type="text"
+                value={component.props.parentClassName || ''}
+                onChange={(e) => onPropertyChange('parentClassName', e.target.value)}
+                className="w-full p-2 border rounded-md"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Encrypted Class Name
+              </label>
+              <input
+                type="text"
+                value={component.props.encryptedClassName || ''}
+                onChange={(e) => onPropertyChange('encryptedClassName', e.target.value)}
+                className="w-full p-2 border rounded-md"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Animate On
+              </label>
+              <select
+                value={component.props.animateOn || 'hover'}
+                onChange={(e) => onPropertyChange('animateOn', e.target.value)}
+                className="w-full p-2 border rounded-md"
+              >
+                <option value="hover">Hover</option>
+                <option value="view">View</option>
+              </select>
+            </div>
+          </>
+        );
+      case 'FlowingMenu':
+        return (
+          <>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Menu Items
+              </label>
+              <div className="space-y-4">
+                {(component.props.items || []).map((item, index) => (
+                  <div key={index} className="p-4 border rounded-lg">
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Link
+                      </label>
+                      <input
+                        type="text"
+                        value={item.link}
+                        onChange={(e) => {
+                          const newItems = [...(component.props.items || [])];
+                          newItems[index] = { ...newItems[index], link: e.target.value };
+                          onPropertyChange('items', newItems);
+                        }}
+                        className="w-full p-2 border rounded-md"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Text
+                      </label>
+                      <input
+                        type="text"
+                        value={item.text}
+                        onChange={(e) => {
+                          const newItems = [...(component.props.items || [])];
+                          newItems[index] = { ...newItems[index], text: e.target.value };
+                          onPropertyChange('items', newItems);
+                        }}
+                        className="w-full p-2 border rounded-md"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Image URL
+                      </label>
+                      <input
+                        type="text"
+                        value={item.image}
+                        onChange={(e) => {
+                          const newItems = [...(component.props.items || [])];
+                          newItems[index] = { ...newItems[index], image: e.target.value };
+                          onPropertyChange('items', newItems);
+                        }}
+                        className="w-full p-2 border rounded-md"
+                      />
+                    </div>
+                    <button
+                      onClick={() => {
+                        const newItems = [...(component.props.items || [])];
+                        newItems.splice(index, 1);
+                        onPropertyChange('items', newItems);
+                      }}
+                      className="mt-2 px-3 py-1 text-sm text-red-600 bg-red-50 rounded-md hover:bg-red-100"
+                    >
+                      Remove Item
+                    </button>
+                  </div>
+                ))}
+                <button
+                  onClick={() => {
+                    const newItems = [...(component.props.items || [])];
+                    newItems.push({
+                      link: '#',
+                      text: 'New Item',
+                      image: 'https://images.unsplash.com/photo-1682687220063-4742bd7fd538?q=80&w=1000&auto=format&fit=crop'
+                    });
+                    onPropertyChange('items', newItems);
+                  }}
+                  className="w-full px-4 py-2 text-sm text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100"
+                >
+                  Add Menu Item
+                </button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Class Name
+              </label>
+              <input
+                type="text"
+                value={component.props.className || ''}
+                onChange={(e) => onPropertyChange('className', e.target.value)}
+                className="w-full p-2 border rounded-md"
+              />
+            </div>
+          </>
+        );
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="p-4">
+      <h3 className="text-lg font-semibold mb-4">{component.name} Properties</h3>
+      
+      {/* Features Section */}
+      <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+        <h4 className="text-sm font-medium text-gray-700 mb-3">Features</h4>
+        <div className="space-y-2">
+          <button
+            onClick={() => onRemove?.(component.id)}
+            className="w-full flex items-center justify-center px-4 py-2 text-sm text-red-600 bg-white border border-red-200 rounded-md hover:bg-red-50 hover:border-red-300 transition-colors"
+          >
+            <svg
+              className="w-4 h-4 mr-2"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
             >
-              <option value="default">Default Button</option>
-              <option value="primary">Primary Button</option>
-              <option value="secondary">Secondary Button</option>
-              <option value="outline">Outline Button</option>
-              <option value="star">Star Border Button</option>
-            </select>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
+            </svg>
+            Delete Component
+          </button>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => onMoveUp?.(component.id)}
+              className="flex-1 flex items-center justify-center px-4 py-2 text-sm text-gray-600 bg-white border border-gray-200 rounded-md hover:bg-gray-50 hover:border-gray-300 transition-colors"
+            >
+              <svg
+                className="w-4 h-4 mr-2"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 15l7-7 7 7"
+                />
+              </svg>
+              Move Up
+            </button>
+            <button
+              onClick={() => onMoveDown?.(component.id)}
+              className="flex-1 flex items-center justify-center px-4 py-2 text-sm text-gray-600 bg-white border border-gray-200 rounded-md hover:bg-gray-50 hover:border-gray-300 transition-colors"
+            >
+              <svg
+                className="w-4 h-4 mr-2"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
+              Move Down
+            </button>
           </div>
-        )}
+          <button
+            onClick={() => onShowCode?.(component.id)}
+            className="w-full flex items-center justify-center px-4 py-2 text-sm text-blue-600 bg-white border border-blue-200 rounded-md hover:bg-blue-50 hover:border-blue-300 transition-colors"
+          >
+            <svg
+              className="w-4 h-4 mr-2"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
+              />
+            </svg>
+            View Code
+          </button>
+        </div>
+      </div>
+
+      {/* Component Properties */}
+      <div className="space-y-4">
+        {renderProperties()}
       </div>
     </div>
   );
@@ -271,49 +1372,28 @@ export const Builder: React.FC<BuilderProps> = ({ availableComponents }) => {
   }, []);
 
   const handleMoveUp = useCallback((componentId: string) => {
+    console.log('Moving up:', componentId);
     moveComponent(componentId, 'up');
   }, [moveComponent]);
 
   const handleMoveDown = useCallback((componentId: string) => {
+    console.log('Moving down:', componentId);
     moveComponent(componentId, 'down');
   }, [moveComponent]);
 
-  const getComponentCode = (component: Component) => {
-    const props = { ...component.props };
-    const propString = Object.entries(props)
-      .map(([key, value]) => {
-        if (typeof value === 'string') {
-          return `${key}="${value}"`;
-        }
-        if (typeof value === 'object') {
-          return `${key}={${JSON.stringify(value, null, 2)}}`;
-        }
-        return `${key}={${value}}`;
-      })
-      .join('\n  ');
-
-    return `import ${component.type} from './components/${component.type}';\n\nconst MyComponent = () => {\n  return (\n    <${component.type}\n      ${propString}\n    />\n  );\n};\n\nexport default MyComponent;`;
-  };
-
-  const handleShowCode = (componentId: string) => {
-    setSelectedComponentId(componentId);
-  };
-
-  const handleRemoveComponent = (componentId: string) => {
+  const handleRemoveComponent = useCallback((componentId: string) => {
+    console.log('Removing component:', componentId);
     removeComponent(componentId);
     if (selectedComponentId === componentId) {
       setSelectedComponentId(null);
     }
-  };
+  }, [removeComponent, selectedComponentId]);
 
-  const getSelectedComponent = () => {
-    if (!selectedComponentId) return null;
-    return state.dropZones
-      .flatMap((zone) => zone.children)
-      .find((comp) => comp.id === selectedComponentId) || null;
-  };
+  const handleShowCode = useCallback((componentId: string) => {
+    setSelectedComponentId(componentId);
+  }, []);
 
-  const handlePropertyChange = (componentId: string, key: string, value: any) => {
+  const handlePropertyChange = useCallback((componentId: string, key: string, value: any) => {
     const component = state.dropZones
       .flatMap((zone) => zone.children)
       .find((comp) => comp.id === componentId);
@@ -332,30 +1412,14 @@ export const Builder: React.FC<BuilderProps> = ({ availableComponents }) => {
     }
 
     current[keys[keys.length - 1]] = value;
-
-    // Special handling for button type changes
-    if (key === 'ctaButton.buttonType') {
-      if (value === 'star') {
-        updatedProps.ctaButton = {
-          ...updatedProps.ctaButton,
-          buttonType: 'star',
-          variant: 'primary'
-        };
-      } else if (value === 'default') {
-        updatedProps.ctaButton = {
-          ...updatedProps.ctaButton,
-          buttonType: 'default'
-        };
-      } else {
-        updatedProps.ctaButton = {
-          ...updatedProps.ctaButton,
-          buttonType: value,
-          variant: value
-        };
-      }
-    }
-
     updateComponent(componentId, updatedProps);
+  }, [state.dropZones, updateComponent]);
+
+  const getSelectedComponent = () => {
+    if (!selectedComponentId) return null;
+    return state.dropZones
+      .flatMap((zone) => zone.children)
+      .find((comp) => comp.id === selectedComponentId) || null;
   };
 
   const renderComponentCode = (component: Component) => {
@@ -405,16 +1469,24 @@ export const Builder: React.FC<BuilderProps> = ({ availableComponents }) => {
       <div className="flex-1 flex flex-col min-h-0">
         {/* Toolbar */}
         <div className="flex-shrink-0 p-2 bg-gray-100 border-b">
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setIsPreviewMode(!isPreviewMode)}
+                className={`px-3 py-1 rounded ${
+                  isPreviewMode
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-white text-gray-700'
+                }`}
+              >
+                {isPreviewMode ? 'Edit Mode' : 'Preview Mode'}
+              </button>
+            </div>
             <button
-              onClick={() => setIsPreviewMode(!isPreviewMode)}
-              className={`px-3 py-1 rounded ${
-                isPreviewMode
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-white text-gray-700'
-              }`}
+              onClick={() => downloadProject(state.dropZones.flatMap(zone => zone.children))}
+              className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
             >
-              {isPreviewMode ? 'Edit Mode' : 'Preview Mode'}
+              Download Project
             </button>
           </div>
         </div>
@@ -435,102 +1507,15 @@ export const Builder: React.FC<BuilderProps> = ({ availableComponents }) => {
               {state.dropZones.map((zone) => (
                 <div key={zone.id} className="w-full">
                   {zone.children.map((component) => (
-                    <div
+                    <ComponentPreview
                       key={component.id}
-                      className={`w-full relative group ${
-                        isPreviewMode ? '' : 'hover:bg-gray-50'
-                      }`}
-                    >
-                      <div className="relative">
-                        {!isPreviewMode && (
-                          <div className="absolute right-2 top-2 z-[100]">
-                            <div className="bg-white/90 backdrop-blur-sm rounded-full shadow-lg p-1 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button
-                                onClick={() => handleRemoveComponent(component.id)}
-                                className="p-1.5 text-red-500 rounded-full hover:bg-red-50"
-                                title="Delete component"
-                              >
-                                <svg
-                                  className="w-4 h-4"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                  />
-                                </svg>
-                              </button>
-                              <button
-                                onClick={() => handleMoveUp(component.id)}
-                                className="p-1.5 text-gray-700 rounded-full hover:bg-gray-50"
-                                title="Move up"
-                              >
-                                <svg
-                                  className="w-4 h-4"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M5 15l7-7 7 7"
-                                  />
-                                </svg>
-                              </button>
-                              <button
-                                onClick={() => handleMoveDown(component.id)}
-                                className="p-1.5 text-gray-700 rounded-full hover:bg-gray-50"
-                                title="Move down"
-                              >
-                                <svg
-                                  className="w-4 h-4"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M19 9l-7 7-7-7"
-                                  />
-                                </svg>
-                              </button>
-                              <button
-                                onClick={() => handleShowCode(component.id)}
-                                className={`p-1.5 rounded-full ${
-                                  selectedComponentId === component.id
-                                    ? 'bg-blue-50 text-blue-500'
-                                    : 'text-gray-700 hover:bg-gray-50'
-                                }`}
-                                title="Show code"
-                              >
-                                <svg
-                                  className="w-4 h-4"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
-                                  />
-                                </svg>
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                        <ComponentPreview component={component} />
-                      </div>
-                    </div>
+                      component={component}
+                      onRemove={handleRemoveComponent}
+                      onMoveUp={handleMoveUp}
+                      onMoveDown={handleMoveDown}
+                      onShowCode={handleShowCode}
+                      selectedComponentId={selectedComponentId}
+                    />
                   ))}
                 </div>
               ))}
@@ -548,6 +1533,10 @@ export const Builder: React.FC<BuilderProps> = ({ availableComponents }) => {
               handlePropertyChange(selectedComponentId, key, value);
             }
           }}
+          onRemove={handleRemoveComponent}
+          onMoveUp={handleMoveUp}
+          onMoveDown={handleMoveDown}
+          onShowCode={handleShowCode}
         />
       </div>
     </div>
