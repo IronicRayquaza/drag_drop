@@ -23,6 +23,8 @@ import DecryptedText, { DecryptedTextProps } from './DecryptedText';
 import FlowingMenu, { FlowingMenuProps } from './FlowingMenu';
 import { TextPressure } from '@ar-dacity/ardacity-text-pressure';
 import { downloadProject } from '@/utils/projectGenerator';
+import { BuilderPermawebProfile } from './Builder/PermawebProfile';
+import { BuilderPermawebAtomicAsset } from './Builder/PermawebAtomicAsset';
 // import { ArdacityHeaderOne } from '@ar-dacity/ardacity-header-one';
 // import { ArdacityHeaderThree } from '@ar-dacity/ardacity-header-three';
 
@@ -39,6 +41,7 @@ interface ComponentPreviewProps {
   onMoveDown: (id: string) => void;
   onShowCode: (id: string) => void;
   selectedComponentId: string | null;
+  onPropertyChange: (key: string, value: any) => void;
 }
 
 const getFullComponentCode = (component: Component) => {
@@ -64,7 +67,8 @@ const ComponentPreview: React.FC<ComponentPreviewProps> = ({
   onMoveUp, 
   onMoveDown, 
   onShowCode,
-  selectedComponentId 
+  selectedComponentId,
+  onPropertyChange
 }) => {
   const [showFullCode, setShowFullCode] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -369,6 +373,10 @@ end
             </div>
           </div>
         );
+      case 'PermawebProfile':
+        return <BuilderPermawebProfile component={component} onPropertyChange={onPropertyChange} />;
+      case 'PermawebAtomicAsset':
+        return <BuilderPermawebAtomicAsset component={component} onPropertyChange={onPropertyChange} />;
       default:
         return <div>{component.name}</div>;
     }
@@ -1372,6 +1380,82 @@ const PropertiesPanel: React.FC<{
             </div>
           </>
         );
+      case 'PermawebProfile':
+        return (
+          <>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Profile ID
+              </label>
+              <input
+                type="text"
+                value={component.props.profileId || ''}
+                onChange={(e) => onPropertyChange('profileId', e.target.value)}
+                className="w-full p-2 border rounded-md"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Wallet Address
+              </label>
+              <input
+                type="text"
+                value={component.props.walletAddress || ''}
+                onChange={(e) => onPropertyChange('walletAddress', e.target.value)}
+                className="w-full p-2 border rounded-md"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Lua Handler Code
+              </label>
+              <textarea
+                value={component.props.luaCode || ''}
+                onChange={(e) => onPropertyChange('luaCode', e.target.value)}
+                className="w-full p-2 border rounded-md font-mono"
+                rows={10}
+              />
+            </div>
+          </>
+        );
+      case 'PermawebAtomicAsset':
+        return (
+          <>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Asset ID
+              </label>
+              <input
+                type="text"
+                value={component.props.assetId || ''}
+                onChange={(e) => onPropertyChange('assetId', e.target.value)}
+                className="w-full p-2 border rounded-md"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Asset IDs (comma-separated)
+              </label>
+              <input
+                type="text"
+                value={component.props.assetIds?.join(',') || ''}
+                onChange={(e) => onPropertyChange('assetIds', e.target.value.split(',').map(id => id.trim()))}
+                className="w-full p-2 border rounded-md"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Lua Handler Code
+              </label>
+              <textarea
+                value={component.props.luaCode || ''}
+                onChange={(e) => onPropertyChange('luaCode', e.target.value)}
+                className="w-full p-2 border rounded-md font-mono"
+                rows={10}
+              />
+            </div>
+          </>
+        );
       default:
         return null;
     }
@@ -1713,6 +1797,11 @@ export const Builder: React.FC<BuilderProps> = ({ availableComponents }) => {
                       onMoveDown={handleMoveDown}
                       onShowCode={handleShowCode}
                       selectedComponentId={selectedComponentId}
+                      onPropertyChange={(key, value) => {
+                        if (component.id) {
+                          handlePropertyChange(component.id, key, value);
+                        }
+                      }}
                     />
                   ))}
                 </div>

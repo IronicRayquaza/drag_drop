@@ -404,6 +404,77 @@ end
       fontUrl: ''
     },
   },
+  {
+    id: 'permaweb-profile-1',
+    name: 'Permaweb Profile',
+    type: 'PermawebProfile',
+    props: {
+      profileId: '',
+      walletAddress: '',
+      luaCode: `-- Profile handler
+function onProfileCreated(profileId)
+  print('Profile created:', profileId)
+  -- You can store this ID to use with assets
+  return profileId
+end
+
+function onProfileUpdated(profileId)
+  print('Profile updated:', profileId)
+end
+
+-- Example profile data
+local profileData = {
+  username = "testuser",
+  displayName = "Test User",
+  description = "This is a test profile"
+}
+
+-- Example usage:
+-- local profileId = createProfile({
+--   username = "myusername",
+--   displayName = "My Display Name",
+--   description = "My profile description"
+-- })
+-- onProfileCreated(profileId)`
+    },
+  },
+  {
+    id: 'permaweb-atomic-asset-1',
+    name: 'Permaweb Atomic Asset',
+    type: 'PermawebAtomicAsset',
+    props: {
+      assetId: '',
+      assetIds: [],
+      luaCode: `-- Atomic Asset handler
+function onAssetCreated(assetId)
+  print('Asset created:', assetId)
+  -- You can store this ID to view the asset later
+  return assetId
+end
+
+function onAssetUpdated(assetId)
+  print('Asset updated:', assetId)
+end
+
+-- Example asset data
+local assetData = {
+  name = "Test Asset",
+  description = "This is a test asset",
+  topics = {"test", "example"},
+  data = "Hello, Permaweb!",
+  contentType = "text/plain",
+  assetType = "document"
+}
+
+-- Example usage:
+-- local assetId = createAtomicAsset({
+--   name = "My Asset",
+--   description = "My asset description",
+--   topics = {"topic1", "topic2"}
+-- })
+-- onAssetCreated(assetId)`
+    },
+  },
   // Commenting out header components until we find a fix
   /*
   {
