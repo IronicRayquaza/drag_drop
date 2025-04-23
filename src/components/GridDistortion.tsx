@@ -1,15 +1,8 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import * as THREE from 'three';
 import './GridDistortion.css';
-
-export interface GridDistortionProps {
-  imageSrc: string;
-  grid?: number;
-  mouse?: number;
-  strength?: number;
-  relaxation?: number;
-  className?: string;
-}
+import { ArweaveGridProps } from '@/types/arweave';
+import { createAOProcess, executeLuaHandler, commonLuaHandlers } from '@/utils/arweaveUtils';
 
 const vertexShader = `
 varying vec2 vUv;
@@ -47,13 +40,22 @@ void main() {
   gl_FragColor = texture2D(uTexture, uv);
 }`;
 
-const GridDistortion: React.FC<GridDistortionProps> = ({
+const GridDistortion: React.FC<ArweaveGridProps> = ({
   imageSrc,
   grid = 15,
   mouse = 0.1,
   strength = 0.15,
   relaxation = 0.9,
-  className = ''
+  className = '',
+  aoProcessId,
+  luaCode,
+  onConnect,
+  onDisconnect,
+  onTransaction,
+  onMessage,
+  onInbox,
+  onError,
+  onGridUpdate
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -61,6 +63,142 @@ const GridDistortion: React.FC<GridDistortionProps> = ({
   const cameraRef = useRef<THREE.OrthographicCamera | null>(null);
   const textureRef = useRef<THREE.Texture | null>(null);
   const materialRef = useRef<THREE.ShaderMaterial | null>(null);
+  const [process, setProcess] = useState<any>(null);
+  const [gridPresets, setGridPresets] = useState<any[]>([]);
+
+  useEffect(() => {
+    // Initialize AO process if not provided
+    if (!aoProcessId) {
+      createAOProcess('GridDistortion', 'A grid distortion effect with Lua handlers', [
+        ...commonLuaHandlers,
+        {
+          name: 'updateGrid',
+          code: `function updateGrid(params)
+  local grid = params.grid or 15
+  local mouse = params.mouse or 0.1
+  local strength = params.strength or 0.15
+  local relaxation = params.relaxation or 0.9
+  
+  return {
+    success = true,
+    grid = grid,
+    mouse = mouse,
+    strength = strength,
+    relaxation = relaxation
+  }
+end`,
+          description: 'Update grid distortion parameters',
+          parameters: [
+            { name: 'grid', type: 'number', description: 'Grid size' },
+            { name: 'mouse', type: 'number', description: 'Mouse sensitivity' },
+            { name: 'strength', type: 'number', description: 'Distortion strength' },
+            { name: 'relaxation', type: 'number', description: 'Distortion relaxation' }
+          ],
+          returnType: '{ success: boolean, grid: number, mouse: number, strength: number, relaxation: number }',
+          example: `local result = updateGrid({ grid = 20, mouse = 0.2, strength = 0.2, relaxation = 0.8 })
+print(result.success) -- true
+print(result.grid) -- 20`
+        },
+        {
+          name: 'saveGridPreset',
+          code: `function saveGridPreset(params)
+  local name = params.name or "Default Preset"
+  local grid = params.grid or 15
+  local mouse = params.mouse or 0.1
+  local strength = params.strength or 0.15
+  local relaxation = params.relaxation or 0.9
+  
+  -- Store preset in Arweave
+  local preset = {
+    name = name,
+    grid = grid,
+    mouse = mouse,
+    strength = strength,
+    relaxation = relaxation,
+    timestamp = os.time()
+  }
+  
+  return {
+    success = true,
+    preset = preset
+  }
+end`,
+          description: 'Save current grid settings as a preset',
+          parameters: [
+            { name: 'name', type: 'string', description: 'Preset name' },
+            { name: 'grid', type: 'number', description: 'Grid size' },
+            { name: 'mouse', type: 'number', description: 'Mouse sensitivity' },
+            { name: 'strength', type: 'number', description: 'Distortion strength' },
+            { name: 'relaxation', type: 'number', description: 'Distortion relaxation' }
+          ],
+          returnType: '{ success: boolean, preset: { name: string, grid: number, mouse: number, strength: number, relaxation: number, timestamp: number } }',
+          example: `local result = saveGridPreset({ name = "My Preset", grid = 20, mouse = 0.2, strength = 0.2, relaxation = 0.8 })
+print(result.success) -- true
+print(result.preset.name) -- "My Preset"`
+        },
+        {
+          name: 'loadGridPreset',
+          code: `function loadGridPreset(params)
+  local presetId = params.presetId
+  
+  -- Load preset from Arweave
+  local preset = {
+    name = "Loaded Preset",
+    grid = 20,
+    mouse = 0.2,
+    strength = 0.2,
+    relaxation = 0.8
+  }
+  
+  return {
+    success = true,
+    preset = preset
+  }
+end`,
+          description: 'Load a saved grid preset',
+          parameters: [
+            { name: 'presetId', type: 'string', description: 'Preset ID' }
+          ],
+          returnType: '{ success: boolean, preset: { name: string, grid: number, mouse: number, strength: number, relaxation: number } }',
+          example: `local result = loadGridPreset({ presetId = "preset123" })
+print(result.success) -- true
+print(result.preset.name) -- "Loaded Preset"`
+        },
+        {
+          name: 'shareGridState',
+          code: `function shareGridState(params)
+  local grid = params.grid or 15
+  local mouse = params.mouse or 0.1
+  local strength = params.strength or 0.15
+  local relaxation = params.relaxation or 0.9
+  
+  -- Share state through AO messages
+  return {
+    success = true,
+    message = {
+      type = "gridState",
+      grid = grid,
+      mouse = mouse,
+      strength = strength,
+      relaxation = relaxation
+    }
+  }
+end`,
+          description: 'Share current grid state with other users',
+          parameters: [
+            { name: 'grid', type: 'number', description: 'Grid size' },
+            { name: 'mouse', type: 'number', description: 'Mouse sensitivity' },
+            { name: 'strength', type: 'number', description: 'Distortion strength' },
+            { name: 'relaxation', type: 'number', description: 'Distortion relaxation' }
+          ],
+          returnType: '{ success: boolean, message: { type: string, grid: number, mouse: number, strength: number, relaxation: number } }',
+          example: `local result = shareGridState({ grid = 20, mouse = 0.2, strength = 0.2, relaxation = 0.8 })
+print(result.success) -- true
+print(result.message.type) -- "gridState"`
+        }
+      ]).then(setProcess);
+    }
+  }, [aoProcessId]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -116,6 +254,15 @@ const GridDistortion: React.FC<GridDistortionProps> = ({
         const x = (e.clientX - rect.left) / rect.width;
         const y = 1 - (e.clientY - rect.top) / rect.height;
         material.uniforms.mouse.value.set(x, y);
+
+        // Execute Lua handler for mouse movement
+        if (process) {
+          executeLuaHandler(process.id, 'onMessage', {
+            type: 'mouseMove',
+            x,
+            y
+          }).catch(onError);
+        }
       };
 
       window.addEventListener('resize', handleResize);
@@ -169,7 +316,62 @@ const GridDistortion: React.FC<GridDistortionProps> = ({
         cameraRef.current = null;
       }
     };
-  }, [imageSrc, grid, strength, relaxation]);
+  }, [imageSrc, grid, strength, relaxation, process, onError]);
+
+  // Handle grid updates through Lua
+  useEffect(() => {
+    if (process && onGridUpdate) {
+      executeLuaHandler(process.id, 'updateGrid', {
+        grid,
+        mouse,
+        strength,
+        relaxation
+      })
+        .then(result => {
+          if (result.success) {
+            onGridUpdate({
+              grid: result.grid,
+              mouse: result.mouse,
+              strength: result.strength,
+              relaxation: result.relaxation
+            });
+          }
+        })
+        .catch(onError);
+    }
+  }, [grid, mouse, strength, relaxation, process, onGridUpdate, onError]);
+
+  // Handle grid presets
+  useEffect(() => {
+    if (process) {
+      // Load saved presets
+      executeLuaHandler(process.id, 'loadGridPreset', { presetId: 'all' })
+        .then(result => {
+          if (result.success && result.presets) {
+            setGridPresets(result.presets);
+          }
+        })
+        .catch(onError);
+    }
+  }, [process, onError]);
+
+  // Handle shared grid states
+  useEffect(() => {
+    if (process && onMessage) {
+      const handleMessage = (message: any) => {
+        if (message.type === 'gridState') {
+          onGridUpdate?.({
+            grid: message.grid,
+            mouse: message.mouse,
+            strength: message.strength,
+            relaxation: message.relaxation
+          });
+        }
+      };
+
+      onMessage(handleMessage);
+    }
+  }, [process, onMessage, onGridUpdate]);
 
   return (
     <div 
@@ -184,7 +386,66 @@ const GridDistortion: React.FC<GridDistortionProps> = ({
         borderRadius: '8px',
         boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
       }}
-    />
+    >
+      {/* Add preset controls */}
+      <div className="grid-preset-controls">
+        <select
+          onChange={(e) => {
+            const preset = gridPresets.find(p => p.id === e.target.value);
+            if (preset) {
+              onGridUpdate?.({
+                grid: preset.grid,
+                mouse: preset.mouse,
+                strength: preset.strength,
+                relaxation: preset.relaxation
+              });
+            }
+          }}
+        >
+          <option value="">Select Preset</option>
+          {gridPresets.map(preset => (
+            <option key={preset.id} value={preset.id}>
+              {preset.name}
+            </option>
+          ))}
+        </select>
+        <button
+          onClick={() => {
+            if (process) {
+              executeLuaHandler(process.id, 'saveGridPreset', {
+                name: 'Custom Preset',
+                grid,
+                mouse,
+                strength,
+                relaxation
+              })
+                .then(result => {
+                  if (result.success) {
+                    setGridPresets(prev => [...prev, result.preset]);
+                  }
+                })
+                .catch(onError);
+            }
+          }}
+        >
+          Save Current as Preset
+        </button>
+        <button
+          onClick={() => {
+            if (process) {
+              executeLuaHandler(process.id, 'shareGridState', {
+                grid,
+                mouse,
+                strength,
+                relaxation
+              }).catch(onError);
+            }
+          }}
+        >
+          Share Current State
+        </button>
+      </div>
+    </div>
   );
 };
 

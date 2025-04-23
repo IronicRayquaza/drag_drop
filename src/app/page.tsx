@@ -12,6 +12,10 @@ import ArweaveForm from '@/components/ArweaveForm';
 import MessageSignerForm from '@/components/MessageSignerForm';
 import ArweaveNFT from '@/components/ArweaveNFT';
 import CredentialsNavbar from '@/components/CredentialsNavbar';
+import { TextPressure } from '@ar-dacity/ardacity-text-pressure';
+import DecryptedText, { DecryptedTextProps } from '@/components/DecryptedText';
+import FlowingMenu, { FlowingMenuProps } from '@/components/FlowingMenu';
+import { downloadProject } from '@/utils/projectGenerator';
 // Remove the CSS imports for now since they're not available
 // We'll handle styling through the component props
 
@@ -381,6 +385,25 @@ end
       className: 'h-screen'
     }
   },
+  {
+    id: 'text-pressure-1',
+    name: 'Text Pressure',
+    type: 'TextPressure',
+    props: {
+      text: 'Press me!',
+      flex: true,
+      alpha: false,
+      stroke: true,
+      width: true,
+      weight: true,
+      italic: true,
+      textColor: '#000000',
+      strokeColor: '#ffffff',
+      minFontSize: 48,
+      fontFamily: 'Arial',
+      fontUrl: ''
+    },
+  },
   // Commenting out header components until we find a fix
   /*
   {
@@ -468,6 +491,20 @@ export default function Home() {
         "/image3.jpeg"
       ]}
     /> */}
+    {/* <div style={{position: 'relative', height: '700px'}}>
+  <TextPressure
+    text="Ardacity!"
+    flex={true}
+    alpha={false}
+    stroke={false}
+    width={true}
+    weight={true}
+    italic={true}
+    textColor="#000"
+    strokeColor="#ff0000"
+    minFontSize={36}
+  />
+</div> */}
       <Builder availableComponents={availableComponents} />
     </main>
   );

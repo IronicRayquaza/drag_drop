@@ -12,6 +12,7 @@
     "@ar-dacity/ardacity-header-one": "^0.1.0",
     "@ar-dacity/ardacity-header-three": "^0.1.1",
     "@ar-dacity/ardacity-navbar": "^0.1.0",
+    "@ar-dacity/ardacity-text-pressure": "^1.0.3",
     "@ar-dacity/ardacity-wallet-btn": "^0.1.0",
     "@betteridea/codecell": "^1.4.4",
     "@types/react-syntax-highlighter": "^15.5.13",

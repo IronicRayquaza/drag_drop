@@ -21,6 +21,7 @@ import CredentialsNavbar from './CredentialsNavbar';
 import type { CredentialsNavbarProps } from './CredentialsNavbar';
 import DecryptedText, { DecryptedTextProps } from './DecryptedText';
 import FlowingMenu, { FlowingMenuProps } from './FlowingMenu';
+import { TextPressure } from '@ar-dacity/ardacity-text-pressure';
 import { downloadProject } from '@/utils/projectGenerator';
 // import { ArdacityHeaderOne } from '@ar-dacity/ardacity-header-one';
 // import { ArdacityHeaderThree } from '@ar-dacity/ardacity-header-three';
@@ -40,6 +41,23 @@ interface ComponentPreviewProps {
   selectedComponentId: string | null;
 }
 
+const getFullComponentCode = (component: Component) => {
+  const props = { ...component.props };
+  const propString = Object.entries(props)
+    .map(([key, value]) => {
+      if (typeof value === 'string') {
+        return `  ${key}="${value}"`;
+      }
+      if (typeof value === 'object') {
+        return `  ${key}={${JSON.stringify(value, null, 2)}}`;
+      }
+      return `  ${key}={${value}}`;
+    })
+    .join('\n');
+
+  return `import ${component.type} from './components/${component.type}';\n\nconst MyComponent = () => {\n  return (\n    <${component.type}\n${propString}\n    />\n  );\n};\n\nexport default MyComponent;`;
+};
+
 const ComponentPreview: React.FC<ComponentPreviewProps> = ({ 
   component, 
   onRemove, 
@@ -49,6 +67,7 @@ const ComponentPreview: React.FC<ComponentPreviewProps> = ({
   selectedComponentId 
 }) => {
   const [showFullCode, setShowFullCode] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
 
   const handleRemove = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -289,6 +308,12 @@ end
       ],
       className: 'h-screen'
     },
+    TextPressure: {
+      text: 'Press me!',
+      pressure: 0.5,
+      minPressure: 0,
+      maxPressure: 1
+    },
   };
 
   const props = { ...defaultProps[component.type], ...component.props } as ComponentProps;
@@ -335,15 +360,30 @@ end
         return <DecryptedText {...(props as DecryptedTextProps)} />;
       case 'FlowingMenu':
         return <FlowingMenu {...(props as FlowingMenuProps)} />;
+      case 'TextPressure':
+        return (
+          <div className="relative w-full h-[200px] flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg shadow-lg overflow-hidden">
+            <div className="absolute inset-0 bg-white/10 backdrop-blur-sm"></div>
+            <div className="relative z-10 w-full h-full flex items-center justify-center">
+              <TextPressure {...component.props} />
+            </div>
+          </div>
+        );
       default:
         return <div>{component.name}</div>;
     }
   };
 
   return (
-    <div className="relative w-full group">
+    <div 
+      className="relative w-full group"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
       <div className="absolute right-2 top-2 z-[100]">
-        <div className="bg-white/90 backdrop-blur-sm rounded-full shadow-lg p-1 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className={`bg-white/90 backdrop-blur-sm rounded-full shadow-lg p-1 flex space-x-1 transition-opacity duration-200 ${
+          isHovered ? 'opacity-100' : 'opacity-0'
+        }`}>
           <button
             onClick={handleRemove}
             className="p-1.5 text-red-500 rounded-full hover:bg-red-50"
@@ -425,13 +465,20 @@ end
             </svg>
           </button>
           <button
-            onClick={() => setShowFullCode(!showFullCode)}
-            className={`p-1.5 rounded-full ${
-              showFullCode
-                ? 'bg-blue-50 text-blue-500'
-                : 'text-gray-700 hover:bg-gray-50'
-            }`}
-            title="View full code"
+            onClick={() => {
+              const code = getFullComponentCode(component);
+              const blob = new Blob([code], { type: 'text/plain' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `${component.type}.jsx`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+            }}
+            className="p-1.5 text-gray-700 rounded-full hover:bg-gray-50"
+            title="Download code"
           >
             <svg
               className="w-4 h-4"
@@ -449,37 +496,11 @@ end
           </button>
         </div>
       </div>
-      {showFullCode && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-gray-900 rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium text-white">Full Component Code</h3>
-              <button
-                onClick={() => setShowFullCode(false)}
-                className="text-gray-400 hover:text-white"
-              >
-                <svg
-                  className="w-6 h-6"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-            <pre className="bg-gray-800 rounded-lg p-4 overflow-x-auto">
-              <code className="text-sm text-gray-100">{getFullComponentCode(component)}</code>
-            </pre>
-          </div>
-        </div>
-      )}
-      {renderComponent()}
+      <div className={`relative transition-all duration-200 ${
+        isHovered ? 'ring-2 ring-blue-500 ring-opacity-50' : ''
+      }`}>
+        {renderComponent()}
+      </div>
     </div>
   );
 };
@@ -491,7 +512,8 @@ const PropertiesPanel: React.FC<{
   onMoveUp?: (id: string) => void;
   onMoveDown?: (id: string) => void;
   onShowCode?: (id: string) => void;
-}> = ({ component, onPropertyChange, onRemove, onMoveUp, onMoveDown, onShowCode }) => {
+  selectedComponentId: string | null;
+}> = ({ component, onPropertyChange, onRemove, onMoveUp, onMoveDown, onShowCode, selectedComponentId }) => {
   if (!component) {
     return (
       <div className="p-4 text-center text-gray-500">
@@ -1238,6 +1260,118 @@ const PropertiesPanel: React.FC<{
             </div>
           </>
         );
+      case 'TextPressure':
+        return (
+          <>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Text
+              </label>
+              <input
+                type="text"
+                value={component.props.text || ''}
+                onChange={(e) => onPropertyChange('text', e.target.value)}
+                className="w-full p-2 border rounded-md"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Text Color
+              </label>
+              <input
+                type="color"
+                value={component.props.textColor || '#000'}
+                onChange={(e) => onPropertyChange('textColor', e.target.value)}
+                className="w-full h-10 p-1 border rounded-md"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Stroke Color
+              </label>
+              <input
+                type="color"
+                value={component.props.strokeColor || '#ff0000'}
+                onChange={(e) => onPropertyChange('strokeColor', e.target.value)}
+                className="w-full h-10 p-1 border rounded-md"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Min Font Size
+              </label>
+              <input
+                type="number"
+                value={component.props.minFontSize || 36}
+                onChange={(e) => onPropertyChange('minFontSize', parseInt(e.target.value))}
+                className="w-full p-2 border rounded-md"
+                min="12"
+                max="72"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Effects
+              </label>
+              <div className="space-y-2">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={component.props.flex}
+                    onChange={(e) => onPropertyChange('flex', e.target.checked)}
+                    className="mr-2"
+                  />
+                  Flex
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={component.props.alpha}
+                    onChange={(e) => onPropertyChange('alpha', e.target.checked)}
+                    className="mr-2"
+                  />
+                  Alpha
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={component.props.stroke}
+                    onChange={(e) => onPropertyChange('stroke', e.target.checked)}
+                    className="mr-2"
+                  />
+                  Stroke
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={component.props.width}
+                    onChange={(e) => onPropertyChange('width', e.target.checked)}
+                    className="mr-2"
+                  />
+                  Width
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={component.props.weight}
+                    onChange={(e) => onPropertyChange('weight', e.target.checked)}
+                    className="mr-2"
+                  />
+                  Weight
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={component.props.italic}
+                    onChange={(e) => onPropertyChange('italic', e.target.checked)}
+                    className="mr-2"
+                  />
+                  Italic
+                </label>
+              </div>
+            </div>
+          </>
+        );
       default:
         return null;
     }
@@ -1329,6 +1463,36 @@ const PropertiesPanel: React.FC<{
             </svg>
             View Code
           </button>
+          <button
+            onClick={() => {
+              const code = getFullComponentCode(component);
+              const blob = new Blob([code], { type: 'text/plain' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `${component.type}.jsx`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+            }}
+            className="w-full flex items-center justify-center px-4 py-2 text-sm text-green-600 bg-white border border-green-200 rounded-md hover:bg-green-50 hover:border-green-300 transition-colors"
+          >
+            <svg
+              className="w-4 h-4 mr-2"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
+            </svg>
+            Download Code
+          </button>
         </div>
       </div>
 
@@ -1336,6 +1500,40 @@ const PropertiesPanel: React.FC<{
       <div className="space-y-4">
         {renderProperties()}
       </div>
+
+      {/* Code Preview */}
+      {selectedComponentId === component.id && (
+        <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+          <h4 className="text-sm font-medium text-gray-700 mb-3">Code Preview</h4>
+          <div className="relative">
+            <SyntaxHighlighter language="jsx" style={atomDark}>
+              {getFullComponentCode(component)}
+            </SyntaxHighlighter>
+            <button
+              onClick={() => {
+                const code = getFullComponentCode(component);
+                navigator.clipboard.writeText(code);
+              }}
+              className="absolute top-2 right-2 p-2 text-gray-400 hover:text-gray-600 bg-white/50 rounded-md hover:bg-white/80 transition-colors"
+              title="Copy code"
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -1537,6 +1735,7 @@ export const Builder: React.FC<BuilderProps> = ({ availableComponents }) => {
           onMoveUp={handleMoveUp}
           onMoveDown={handleMoveDown}
           onShowCode={handleShowCode}
+          selectedComponentId={selectedComponentId}
         />
       </div>
     </div>
