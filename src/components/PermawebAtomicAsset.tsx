@@ -1,24 +1,158 @@
 import React, { useState, useEffect } from 'react';
 import { usePermawebProvider } from '../providers/PermawebProvider';
+import { connectWallet, disconnectWallet, getWalletAddress, dryrunResult } from './arweaveUtils';
+import MonacoEditor from '@monaco-editor/react';
+import { dryrun } from '@permaweb/aoconnect';
 
-interface AtomicAssetProps {
-  assetId?: string;
-  assetIds?: string[];
-  onCreateAsset?: (assetId: string) => void;
-  luaCode?: string;
+interface PermawebAtomicAssetProps {
+  onAssetCreated?: (assetId: string) => void;
 }
 
-export const PermawebAtomicAsset: React.FC<AtomicAssetProps> = ({
-  assetId,
-  assetIds,
-  onCreateAsset,
-  luaCode
+interface Tag {
+  name: string;
+  value: string;
+}
+
+declare global {
+  interface Window {
+    arweaveWallet: {
+      connect: (permissions: string[]) => Promise<void>;
+      getActiveAddress: () => Promise<string>;
+      disconnect: () => Promise<void>;
+    };
+  }
+}
+
+const PermawebAtomicAsset: React.FC<PermawebAtomicAssetProps> = ({
+  onAssetCreated
 }) => {
   const { libs } = usePermawebProvider();
   const [asset, setAsset] = useState<any>(null);
   const [assets, setAssets] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [walletAddress, setWalletAddress] = useState<string>('');
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [luaCode, setLuaCode] = useState<string>(`-- Atomic Asset Handler
+function handle(state, action)
+  -- Initialize state if not exists
+  state = state or {
+    assets = {},
+    nextId = 1
+  }
+
+  -- Validate action
+  if not action.input then
+    return { error = "No input provided" }
+  end
+
+  -- Create Asset
+  if action.input.function == "create" then
+    -- Validate required fields
+    if not action.input.name or not action.input.description then
+      return { error = "Name and description are required" }
+    end
+
+    -- Create new asset
+    local asset = {
+      id = tostring(state.nextId),
+      name = action.input.name,
+      description = action.input.description,
+      topics = action.input.topics or {},
+      creator = action.caller,
+      data = action.input.data,
+      contentType = action.input.contentType,
+      assetType = action.input.assetType,
+      metadata = action.input.metadata or {},
+      createdAt = os.time(),
+      updatedAt = os.time()
+    }
+
+    -- Store asset
+    state.assets[asset.id] = asset
+    state.nextId = state.nextId + 1
+
+    return { state = state, result = asset }
+  end
+
+  -- Get Asset
+  if action.input.function == "get" then
+    local assetId = action.input.assetId
+    if not assetId then
+      return { error = "Asset ID is required" }
+    end
+
+    local asset = state.assets[assetId]
+    if not asset then
+      return { error = "Asset not found" }
+    end
+
+    return { result = asset }
+  end
+
+  -- List Assets
+  if action.input.function == "list" then
+    local assets = {}
+    for id, asset in pairs(state.assets) do
+      table.insert(assets, asset)
+    end
+    return { result = assets }
+  end
+
+  -- Update Asset
+  if action.input.function == "update" then
+    local assetId = action.input.assetId
+    if not assetId then
+      return { error = "Asset ID is required" }
+    end
+
+    local asset = state.assets[assetId]
+    if not asset then
+      return { error = "Asset not found" }
+    end
+
+    -- Only creator can update
+    if asset.creator ~= action.caller then
+      return { error = "Only creator can update asset" }
+    end
+
+    -- Update fields
+    asset.name = action.input.name or asset.name
+    asset.description = action.input.description or asset.description
+    asset.topics = action.input.topics or asset.topics
+    asset.data = action.input.data or asset.data
+    asset.contentType = action.input.contentType or asset.contentType
+    asset.assetType = action.input.assetType or asset.assetType
+    asset.metadata = action.input.metadata or asset.metadata
+    asset.updatedAt = os.time()
+
+    state.assets[assetId] = asset
+    return { state = state, result = asset }
+  end
+
+  -- Delete Asset
+  if action.input.function == "delete" then
+    local assetId = action.input.assetId
+    if not assetId then
+      return { error = "Asset ID is required" }
+    end
+
+    local asset = state.assets[assetId]
+    if not asset then
+      return { error = "Asset not found" }
+    end
+
+    -- Only creator can delete
+    if asset.creator ~= action.caller then
+      return { error = "Only creator can delete asset" }
+    end
+
+    state.assets[assetId] = nil
+    return { state = state, result = { success = true } }
+  end
+
+  return { error = "Unknown function" }
+end`);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -31,16 +165,57 @@ export const PermawebAtomicAsset: React.FC<AtomicAssetProps> = ({
       status: 'Initial Status'
     }
   });
+  const [dryrunResult, setDryrunResult] = useState<any>(null);
 
   useEffect(() => {
-    if (libs) {
+    const checkWallet = async () => {
+      if (window.arweaveWallet) {
+        try {
+          const address = await getWalletAddress();
+          setWalletAddress(address);
+        } catch (error) {
+          console.error('Failed to get wallet address:', error);
+        }
+      }
+    };
+    checkWallet();
+  }, []);
+
+  const handleConnectWallet = async () => {
+    setIsConnecting(true);
+    try {
+      await connectWallet();
+      const address = await getWalletAddress();
+      setWalletAddress(address);
+      setError(null);
+    } catch (err) {
+      console.error('Error in handleConnectWallet:', err);
+      setError(err instanceof Error ? err.message : 'Failed to connect wallet');
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  const handleDisconnectWallet = async () => {
+    try {
+      await disconnectWallet();
+      setWalletAddress('');
+      setError(null);
+    } catch (err) {
+      console.error('Error disconnecting wallet:', err);
+      setError(err instanceof Error ? err.message : 'Failed to disconnect wallet');
+    }
+  };
+
+  useEffect(() => {
+    if (libs && walletAddress && (assetId || (assetIds && assetIds.length > 0))) {
       if (assetId) {
         fetchAsset();
       } else if (assetIds && assetIds.length > 0) {
         fetchAssets();
       }
     }
-  }, [libs, assetId, assetIds]);
+  }, [libs, walletAddress, assetId, assetIds]);
 
   const fetchAsset = async () => {
     if (!assetId) return;
@@ -74,14 +249,17 @@ export const PermawebAtomicAsset: React.FC<AtomicAssetProps> = ({
 
   const handleCreateAsset = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!libs) return;
+    if (!libs || !walletAddress) {
+      setError('Not connected to wallet. Please connect your wallet first.');
+      return;
+    }
 
     try {
       setLoading(true);
       setError(null);
       const newAssetId = await libs.createAtomicAsset(formData);
       setAsset(await libs.getAtomicAsset(newAssetId));
-      onCreateAsset?.(newAssetId);
+      onAssetCreated?.(newAssetId);
     } catch (err) {
       setError('Failed to create asset');
       console.error(err);
@@ -113,6 +291,255 @@ export const PermawebAtomicAsset: React.FC<AtomicAssetProps> = ({
     });
   };
 
+  const handleDryrunTest = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('Starting dryrun test...');
+      console.log('Form data:', formData);
+      
+      // Prepare the input for the dryrun
+      const input = {
+        function: "create",
+        name: formData.name,
+        description: formData.description,
+        topics: formData.topics,
+        data: formData.data,
+        contentType: formData.contentType,
+        assetType: formData.assetType,
+        metadata: formData.metadata
+      };
+
+      console.log('Sending dryrun request with input:', input);
+
+      // Example dryrun test for atomic asset creation
+      const result = await dryrunResult('YOUR_PROCESS_ID', [
+        { name: 'Action', value: 'Create-Asset' },
+        { name: 'Input', value: JSON.stringify(input) },
+        { name: 'Caller', value: walletAddress }
+      ]);
+
+      console.log('Dryrun response:', result);
+      
+      if (result.error) {
+        console.error('Dryrun error:', result.error);
+        setError(result.error);
+      } else {
+        console.log('Dryrun successful:', result);
+      }
+    } catch (err) {
+      console.error('Error in dryrun test:', err);
+      setError(err instanceof Error ? err.message : 'Failed to perform dryrun test');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLuaCodeChange = (value: string | undefined) => {
+    if (value) {
+      setLuaCode(value);
+    }
+  };
+
+  const handleRunCode = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('Running Lua handler code...');
+      
+      // Prepare test input
+      const testInput = {
+        function: "create",
+        name: "Test Asset",
+        description: "This is a test asset",
+        topics: ["test", "demo"],
+        data: "Test data",
+        contentType: "text/plain",
+        assetType: "test",
+        metadata: {
+          status: "test"
+        }
+      };
+
+      console.log('Test input:', testInput);
+
+      // Run the code with test input
+      const result = await dryrunResult('YOUR_PROCESS_ID', [
+        { name: 'Action', value: 'Run-Code' },
+        { name: 'Input', value: JSON.stringify(testInput) },
+        { name: 'Caller', value: walletAddress },
+        { name: 'Code', value: luaCode }
+      ]);
+
+      console.log('Code execution result:', result);
+      
+      if (result.error) {
+        console.error('Code execution error:', result.error);
+        setError(result.error);
+      } else {
+        console.log('Code executed successfully:', result);
+      }
+    } catch (err) {
+      console.error('Error running code:', err);
+      setError(err instanceof Error ? err.message : 'Failed to run code');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDryrun = async () => {
+    if (!walletAddress) {
+      setError('Please connect your wallet first');
+      return;
+    }
+
+    if (!processId) {
+      setError('Process ID is required for dryrun');
+      return;
+    }
+
+    if (!luaCode) {
+      setError('Please provide Lua code to execute');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const result = await dryrun({
+        process: processId,
+        data: luaCode,
+        tags: [
+          { name: 'Action', value: 'Dryrun' }
+        ]
+      });
+
+      console.log('Dryrun result:', result);
+      setDryrunResult(result);
+      if (onAssetCreated) {
+        onAssetCreated(result.result.id);
+      }
+    } catch (err) {
+      console.error('Error executing dryrun:', err);
+      setError(err instanceof Error ? err.message : 'Failed to execute dryrun');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTestHandler = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Test create operation
+      const createInput = {
+        function: "create",
+        name: "Test Asset",
+        description: "This is a test asset",
+        topics: ["test", "demo"],
+        data: "Test data",
+        contentType: "text/plain",
+        assetType: "test",
+        metadata: {
+          status: "test"
+        }
+      };
+
+      const createResult = await dryrunResult('YOUR_PROCESS_ID', [
+        { name: 'Action', value: 'Create-Asset' },
+        { name: 'Input', value: JSON.stringify(createInput) },
+        { name: 'Caller', value: walletAddress }
+      ]);
+
+      console.log('Create result:', createResult);
+
+      if (createResult.error) {
+        throw new Error(createResult.error);
+      }
+
+      const assetId = createResult.result.id;
+
+      // Test get operation
+      const getInput = {
+        function: "get",
+        assetId: assetId
+      };
+
+      const getResult = await dryrunResult('YOUR_PROCESS_ID', [
+        { name: 'Action', value: 'Get-Asset' },
+        { name: 'Input', value: JSON.stringify(getInput) },
+        { name: 'Caller', value: walletAddress }
+      ]);
+
+      console.log('Get result:', getResult);
+
+      // Test update operation
+      const updateInput = {
+        function: "update",
+        assetId: assetId,
+        name: "Updated Test Asset",
+        description: "This is an updated test asset",
+        topics: ["test", "demo", "updated"],
+        metadata: {
+          status: "updated"
+        }
+      };
+
+      const updateResult = await dryrunResult('YOUR_PROCESS_ID', [
+        { name: 'Action', value: 'Update-Asset' },
+        { name: 'Input', value: JSON.stringify(updateInput) },
+        { name: 'Caller', value: walletAddress }
+      ]);
+
+      console.log('Update result:', updateResult);
+
+      // Test list operation
+      const listInput = {
+        function: "list"
+      };
+
+      const listResult = await dryrunResult('YOUR_PROCESS_ID', [
+        { name: 'Action', value: 'List-Assets' },
+        { name: 'Input', value: JSON.stringify(listInput) },
+        { name: 'Caller', value: walletAddress }
+      ]);
+
+      console.log('List result:', listResult);
+
+      // Test delete operation
+      const deleteInput = {
+        function: "delete",
+        assetId: assetId
+      };
+
+      const deleteResult = await dryrunResult('YOUR_PROCESS_ID', [
+        { name: 'Action', value: 'Delete-Asset' },
+        { name: 'Input', value: JSON.stringify(deleteInput) },
+        { name: 'Caller', value: walletAddress }
+      ]);
+
+      console.log('Delete result:', deleteResult);
+
+      setDryrunResult({
+        create: createResult,
+        get: getResult,
+        update: updateResult,
+        list: listResult,
+        delete: deleteResult
+      });
+
+    } catch (err) {
+      console.error('Error testing handler:', err);
+      setError(err instanceof Error ? err.message : 'Failed to test handler');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (loading) {
     return <div className="p-4">Loading...</div>;
   }
@@ -122,57 +549,36 @@ export const PermawebAtomicAsset: React.FC<AtomicAssetProps> = ({
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-4">
-      {asset ? (
+    <div className="max-w-4xl mx-auto p-4">
+      <div className="mb-4 flex justify-end">
+        {walletAddress ? (
+          <div className="flex items-center space-x-4">
+            <span className="text-sm text-gray-600">
+              {walletAddress.substring(0, 6)}...{walletAddress.substring(walletAddress.length - 4)}
+            </span>
+            <button
+              onClick={handleDisconnectWallet}
+              className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
+            >
+              Disconnect
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleConnectWallet}
+            disabled={isConnecting}
+            className="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded"
+          >
+            {isConnecting ? 'Connecting...' : 'Connect Wallet'}
+          </button>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Form Section */}
         <div className="bg-white rounded-lg shadow-lg p-6">
-          <h2 className="text-2xl font-bold mb-4">{asset.name}</h2>
-          <p className="text-gray-700 mb-4">{asset.description}</p>
-          <div className="mb-4">
-            <h3 className="text-lg font-semibold mb-2">Topics</h3>
-            <div className="flex flex-wrap gap-2">
-              {asset.topics.map((topic: string, index: number) => (
-                <span
-                  key={index}
-                  className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm"
-                >
-                  {topic}
-                </span>
-              ))}
-            </div>
-          </div>
-          <div className="mb-4">
-            <h3 className="text-lg font-semibold mb-2">Metadata</h3>
-            <pre className="bg-gray-100 p-4 rounded-lg overflow-x-auto">
-              {JSON.stringify(asset.metadata, null, 2)}
-            </pre>
-          </div>
-        </div>
-      ) : assetIds && assetIds.length > 0 ? (
-        <div className="space-y-4">
-          {assets.map((asset) => (
-            <div key={asset.id} className="bg-white rounded-lg shadow-lg p-6">
-              <h2 className="text-2xl font-bold mb-4">{asset.name}</h2>
-              <p className="text-gray-700 mb-4">{asset.description}</p>
-              <div className="mb-4">
-                <h3 className="text-lg font-semibold mb-2">Topics</h3>
-                <div className="flex flex-wrap gap-2">
-                  {asset.topics.map((topic: string, index: number) => (
-                    <span
-                      key={index}
-                      className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm"
-                    >
-                      {topic}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <form onSubmit={handleCreateAsset} className="bg-white rounded-lg shadow-lg p-6">
           <h2 className="text-2xl font-bold mb-6">Create Atomic Asset</h2>
-          <div className="space-y-4">
+          <form onSubmit={handleCreateAsset} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 Name
@@ -295,9 +701,133 @@ export const PermawebAtomicAsset: React.FC<AtomicAssetProps> = ({
             >
               Create Asset
             </button>
+          </form>
+        </div>
+
+        {/* Lua Handler Workspace */}
+        <div className="bg-gray-100 rounded-lg shadow-lg p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-2xl font-bold">Lua Handler</h2>
+            <div className="space-x-2">
+              <button
+                onClick={handleRunCode}
+                disabled={loading}
+                className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+              >
+                {loading ? 'Running...' : 'Run Code'}
+              </button>
+              <button
+                onClick={handleDryrunTest}
+                disabled={loading}
+                className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+              >
+                {loading ? 'Testing...' : 'Test Asset'}
+              </button>
+              <button
+                onClick={handleTestHandler}
+                disabled={loading}
+                className="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded"
+              >
+                {loading ? 'Testing...' : 'Test Handler'}
+              </button>
+            </div>
           </div>
-        </form>
+          
+          <div className="mb-4">
+            <MonacoEditor
+              height="400px"
+              defaultLanguage="lua"
+              value={luaCode}
+              onChange={handleLuaCodeChange}
+              theme="vs-dark"
+              options={{
+                minimap: { enabled: false },
+                fontSize: 14,
+                lineNumbers: "on",
+                roundedSelection: false,
+                scrollBeyondLastLine: false,
+                readOnly: false,
+                automaticLayout: true,
+                wordWrap: "on",
+                folding: true,
+                lineDecorationsWidth: 0,
+                lineNumbersMinChars: 3,
+                scrollbar: {
+                  vertical: 'visible',
+                  horizontal: 'visible'
+                }
+              }}
+            />
+          </div>
+
+          {error && (
+            <div className="mt-4 text-red-500">
+              Error: {error}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Asset Display Section */}
+      {asset ? (
+        <div className="bg-white rounded-lg shadow-lg p-6">
+          <h2 className="text-2xl font-bold mb-4">{asset.name}</h2>
+          <p className="text-gray-700 mb-4">{asset.description}</p>
+          <div className="mb-4">
+            <h3 className="text-lg font-semibold mb-2">Topics</h3>
+            <div className="flex flex-wrap gap-2">
+              {asset.topics.map((topic: string, index: number) => (
+                <span
+                  key={index}
+                  className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm"
+                >
+                  {topic}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className="mb-4">
+            <h3 className="text-lg font-semibold mb-2">Metadata</h3>
+            <pre className="bg-gray-100 p-4 rounded-lg overflow-x-auto">
+              {JSON.stringify(asset.metadata, null, 2)}
+            </pre>
+          </div>
+        </div>
+      ) : assetIds && assetIds.length > 0 ? (
+        <div className="space-y-4">
+          {assets.map((asset) => (
+            <div key={asset.id} className="bg-white rounded-lg shadow-lg p-6">
+              <h2 className="text-2xl font-bold mb-4">{asset.name}</h2>
+              <p className="text-gray-700 mb-4">{asset.description}</p>
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold mb-2">Topics</h3>
+                <div className="flex flex-wrap gap-2">
+                  {asset.topics.map((topic: string, index: number) => (
+                    <span
+                      key={index}
+                      className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm"
+                    >
+                      {topic}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {/* Dryrun Results Section */}
+      {dryrunResult && (
+        <div className="mt-4 p-4 bg-gray-50 rounded">
+          <h3 className="text-lg font-medium mb-2">Dryrun Results</h3>
+          <pre className="bg-white p-4 rounded overflow-auto max-h-96">
+            {JSON.stringify(dryrunResult, null, 2)}
+          </pre>
+        </div>
       )}
     </div>
   );
-}; 
+};
+
+export default PermawebAtomicAsset; 

@@ -475,6 +475,16 @@ local assetData = {
 -- onAssetCreated(assetId)`
     },
   },
+  {
+    id: 'process-spawner-1',
+    name: 'Process Spawner',
+    type: 'ProcessSpawner',
+    props: {
+      onProcessSpawned: (processId: string) => {
+        console.log('Process spawned:', processId);
+      }
+    }
+  },
   // Commenting out header components until we find a fix
   /*
   {

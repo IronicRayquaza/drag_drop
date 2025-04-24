@@ -25,6 +25,7 @@ import { TextPressure } from '@ar-dacity/ardacity-text-pressure';
 import { downloadProject } from '@/utils/projectGenerator';
 import { BuilderPermawebProfile } from './Builder/PermawebProfile';
 import { BuilderPermawebAtomicAsset } from './Builder/PermawebAtomicAsset';
+import ProcessSpawner from './ProcessSpawner';
 // import { ArdacityHeaderOne } from '@ar-dacity/ardacity-header-one';
 // import { ArdacityHeaderThree } from '@ar-dacity/ardacity-header-three';
 
@@ -377,6 +378,8 @@ end
         return <BuilderPermawebProfile component={component} onPropertyChange={onPropertyChange} />;
       case 'PermawebAtomicAsset':
         return <BuilderPermawebAtomicAsset component={component} onPropertyChange={onPropertyChange} />;
+      case 'ProcessSpawner':
+        return <ProcessSpawner {...(props as any)} />;
       default:
         return <div>{component.name}</div>;
     }
