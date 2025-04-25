@@ -16,6 +16,7 @@ import { TextPressure } from '@ar-dacity/ardacity-text-pressure';
 import DecryptedText, { DecryptedTextProps } from '@/components/DecryptedText';
 import FlowingMenu, { FlowingMenuProps } from '@/components/FlowingMenu';
 import { downloadProject } from '@/utils/projectGenerator';
+import AOSpawner from '@/components/AOSpawner';
 // Remove the CSS imports for now since they're not available
 // We'll handle styling through the component props
 
@@ -483,6 +484,129 @@ local assetData = {
       onProcessSpawned: (processId: string) => {
         console.log('Process spawned:', processId);
       }
+    }
+  },
+  {
+    id: 'ao-spawner-1',
+    name: 'AO Process Spawner',
+    type: 'AOSpawner',
+    props: {
+      luaCode: `-- Basic process spawning
+local process_id = ao.spawn([==[
+  Name = "MyProcess"
+  Inbox = {}
+  Handlers = {}
+  ao = {
+    id = ao.id,
+    send = ao.send,
+    spawn = ao.spawn
+  }
+
+  -- Handler example
+  Handlers.add(
+    "ping",
+    {Action = "Ping"},
+    function(msg)
+      ao.send({
+        Target = msg.From,
+        Data = "Pong"
+      })
+    end
+  )
+]==])
+
+-- Verify process creation
+assert(process_id ~= nil, "Failed to spawn process")
+
+-- Test the process
+ao.send({
+  Target = process_id,
+  Action = "Ping"
+})
+
+-- Return process ID for verification
+return { process_id = process_id }`
+    }
+  },
+  {
+    id: 'smooth-scroll-hero-1',
+    name: 'Smooth Scroll Hero',
+    type: 'smooth-scroll-hero',
+    props: {
+      backgroundImage: "https://images.unsplash.com/photo-1460186136353-977e9d6085a1?q=80&w=2670&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+      parallaxImages: [
+        {
+          src: "https://images.unsplash.com/photo-1484600899469-230e8d1d59c0?q=80&w=2670&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+          alt: "And example of a space launch",
+          start: -200,
+          end: 200,
+          className: "w-1/3"
+        },
+        {
+          src: "https://images.unsplash.com/photo-1446776709462-d6b525c57bd3?q=80&w=2670&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+          alt: "An example of a space launch",
+          start: 200,
+          end: -250,
+          className: "mx-auto w-2/3"
+        },
+        {
+          src: "https://images.unsplash.com/photo-1541185933-ef5d8ed016c2?q=80&w=2370&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+          alt: "Orbiting satellite",
+          start: -200,
+          end: 200,
+          className: "ml-auto w-1/3"
+        },
+        {
+          src: "https://images.unsplash.com/photo-1494022299300-899b96e49893?q=80&w=2670&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+          alt: "Orbiting satellite",
+          start: 0,
+          end: -500,
+          className: "ml-24 w-5/12"
+        }
+      ],
+      scheduleItems: [
+        { title: "NG-21", date: "Dec 9th", location: "Florida" },
+        { title: "Starlink", date: "Dec 20th", location: "Texas" },
+        { title: "Starlink", date: "Jan 13th", location: "Florida" },
+        { title: "Turksat 6A", date: "Feb 22nd", location: "Florida" },
+        { title: "NROL-186", date: "Mar 1st", location: "California" },
+        { title: "GOES-U", date: "Mar 8th", location: "California" },
+        { title: "ASTRA 1P", date: "Apr 8th", location: "Texas" }
+      ]
+    }
+  },
+  {
+    id: 'dropdown-navbar-1',
+    name: 'Dropdown Navbar',
+    type: 'dropdown-navbar',
+    props: {
+      className: '',
+      style: {}
+    }
+  },
+  {
+    id: 'clip-path-links-1',
+    name: 'Clip Path Links',
+    type: 'clip-path-links',
+    props: {
+      className: '',
+      style: {}
+    }
+  },
+  {
+    id: 'landing-page-one-1',
+    name: 'ArDacity Landing Page',
+    type: 'landing-page-one',
+    props: {
+      title: "ArDacity UI",
+      subtitleLines: [
+        "A collection of UI components",
+        "Making Frontend Development Easier"
+      ],
+      description: "ArDacity UI is a collection of beautiful and functional UI components built for the Arweave ecosystem.",
+      auroraColorStops: ["#3A29FF", "#FF94B4", "#FF3232"],
+      pixelTransitionImgUrl: "https://images.unsplash.com/photo-1682687220063-4742bd7fd538?q=80&w=1000&auto=format&fit=crop",
+      pixelTransitionText: "Making for AO, On AO"
     }
   },
   // Commenting out header components until we find a fix

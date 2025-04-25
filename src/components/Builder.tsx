@@ -26,6 +26,13 @@ import { downloadProject } from '@/utils/projectGenerator';
 import { BuilderPermawebProfile } from './Builder/PermawebProfile';
 import { BuilderPermawebAtomicAsset } from './Builder/PermawebAtomicAsset';
 import ProcessSpawner from './ProcessSpawner';
+import AOSpawner from './AOSpawner';
+import SmoothScrollHero from './SmoothScrollHero';
+import DropdownNavbar from './DropdownNavbar';
+import { ClipPathLinks } from './ClipPathLinks';
+import { LandingPageOne } from '../components/ArDacityUi/LandingPageOne';
+// TODO: Fix LandingPageOne import once package is properly configured
+// import { LandingPageOne } from '@ar-dacity/ardacity-landing-page-one';
 // import { ArdacityHeaderOne } from '@ar-dacity/ardacity-header-one';
 // import { ArdacityHeaderThree } from '@ar-dacity/ardacity-header-three';
 
@@ -380,6 +387,16 @@ end
         return <BuilderPermawebAtomicAsset component={component} onPropertyChange={onPropertyChange} />;
       case 'ProcessSpawner':
         return <ProcessSpawner {...(props as any)} />;
+      case 'AOSpawner':
+        return <AOSpawner {...(props as any)} />;
+      case 'smooth-scroll-hero':
+        return <SmoothScrollHero {...(props as any)} />;
+      case 'dropdown-navbar':
+        return <DropdownNavbar {...(props as any)} />;
+      case 'clip-path-links':
+        return <ClipPathLinks {...(props as any)} />;
+      case 'landing-page-one':
+        return <LandingPageOne {...(props as any)} />;
       default:
         return <div>{component.name}</div>;
     }
