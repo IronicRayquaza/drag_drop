@@ -609,6 +609,16 @@ return { process_id = process_id }`
       pixelTransitionText: "Making for AO, On AO"
     }
   },
+  {
+    id: 'leaderboard-1',
+    name: 'AO Leaderboard',
+    type: 'leaderboard',
+    props: {
+      processId: 'N_boXL20JQirhENJyfml_Geaa5cofYG8BieNA0uKZ6U',
+      title: 'AO Leaderboard',
+      limit: 10
+    }
+  },
   // Commenting out header components until we find a fix
   /*
   {

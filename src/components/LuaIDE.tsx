@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, forwardRef } from 'react';
 
 interface LuaIDEProps {
   cellId: string;
@@ -6,20 +6,25 @@ interface LuaIDEProps {
   onProcessId?: (pid: string) => void;
   onNewMessage?: (msgs: any[]) => void;
   onInbox?: (inbox: any[]) => void;
+  onCodeChange?: (code: string) => void;
 }
 
-const LuaIDE: React.FC<LuaIDEProps> = ({
+const LuaIDE = forwardRef<HTMLTextAreaElement, LuaIDEProps>(({
   cellId,
   initialCode,
   onProcessId,
   onNewMessage,
   onInbox,
-}) => {
+  onCodeChange,
+}, ref) => {
   const [code, setCode] = useState(initialCode);
   const [error, setError] = useState<string | null>(null);
 
   const handleCodeChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setCode(e.target.value);
+    if (onCodeChange) {
+      onCodeChange(e.target.value);
+    }
   };
 
   const handleRun = () => {
@@ -58,10 +63,12 @@ const LuaIDE: React.FC<LuaIDEProps> = ({
     <div className="flex flex-col h-[300px] border rounded-lg overflow-hidden">
       <div className="flex-1 p-4 bg-gray-50">
         <textarea
+          ref={ref}
           value={code}
           onChange={handleCodeChange}
-          className="w-full h-full p-2 font-mono text-sm bg-white border rounded"
+          className="w-full h-full p-2 font-mono text-sm bg-white border rounded text-black"
           placeholder="Enter your Lua code here..."
+          style={{ color: 'black' }}
         />
       </div>
       <div className="p-2 bg-gray-100 border-t">
@@ -74,6 +81,6 @@ const LuaIDE: React.FC<LuaIDEProps> = ({
       </div>
     </div>
   );
-};
+});
 
 export default LuaIDE; 

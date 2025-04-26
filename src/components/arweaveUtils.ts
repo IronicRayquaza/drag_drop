@@ -14,6 +14,7 @@ declare global {
       ) => Promise<void>;
       disconnect: () => Promise<void>;
       getActiveAddress: () => Promise<string>;
+      getArweaveConfig?: () => Promise<{ host: string }>;
     };
   }
 }
@@ -26,13 +27,51 @@ const CommonTags = [
   { name: "Version", value: "0.2.1" },
 ];
 
+/**
+ * Check if arweave wallet is available and connected
+ */
+export async function isWalletConnected(): Promise<boolean> {
+  try {
+    if (!window.arweaveWallet) {
+      console.log('ArConnect not installed');
+      return false;
+    }
+
+    // Try to get the active address to check if already connected
+    try {
+      const address = await window.arweaveWallet.getActiveAddress();
+      return !!address;
+    } catch (error) {
+      // If this fails, the wallet is not connected
+      console.log('Wallet exists but not connected:', error);
+      return false;
+    }
+  } catch (error) {
+    console.error('Error checking wallet connection:', error);
+    return false;
+  }
+}
+
 // connect wallet
 export async function connectWallet(): Promise<void> {
   try {
     if (!window.arweaveWallet) {
-      alert('No Arconnect detected');
-      return;
+      throw new Error('No Arconnect detected. Please install the ArConnect browser extension.');
     }
+
+    // Check if already connected
+    try {
+      const address = await window.arweaveWallet.getActiveAddress();
+      if (address) {
+        console.log('Already connected to wallet:', address);
+        return;
+      }
+    } catch (error) {
+      // Not connected, continue with connection
+      console.log('Not connected, attempting to connect now...');
+    }
+
+    console.log('Connecting to ArConnect wallet...');
     await window.arweaveWallet.connect(
       ['ACCESS_ADDRESS', 'SIGN_TRANSACTION', 'ACCESS_TOKENS'],
       {
@@ -45,11 +84,14 @@ export async function connectWallet(): Promise<void> {
         protocol: 'https',
       }
     );
+    console.log('Successfully connected to ArConnect');
+
+    // Verify connection
+    const address = await window.arweaveWallet.getActiveAddress();
+    console.log('Connected to wallet address:', address);
   } catch (error) {
-    console.error(error);
+    console.error('Error connecting to wallet:', error);
     throw error;
-  } finally {
-    console.log('connection finished execution');
   }
 }
 
@@ -58,7 +100,13 @@ export async function disconnectWallet(): Promise<void> {
   if (!window.arweaveWallet) {
     throw new Error('No Arconnect detected');
   }
-  return await window.arweaveWallet.disconnect();
+  try {
+    await window.arweaveWallet.disconnect();
+    console.log('Disconnected from wallet');
+  } catch (error) {
+    console.error('Error disconnecting wallet:', error);
+    throw error;
+  }
 }
 
 // get wallet details
@@ -66,9 +114,14 @@ export async function getWalletAddress(): Promise<string> {
   if (!window.arweaveWallet) {
     throw new Error('No Arconnect detected');
   }
-  const walletAddress = await window.arweaveWallet.getActiveAddress();
-  console.log(walletAddress);
-  return walletAddress;
+  try {
+    const walletAddress = await window.arweaveWallet.getActiveAddress();
+    console.log('Retrieved wallet address:', walletAddress);
+    return walletAddress;
+  } catch (error) {
+    console.error('Error getting wallet address:', error);
+    throw error;
+  }
 }
 
 // send message to process 

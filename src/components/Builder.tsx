@@ -31,6 +31,7 @@ import SmoothScrollHero from './SmoothScrollHero';
 import DropdownNavbar from './DropdownNavbar';
 import { ClipPathLinks } from './ClipPathLinks';
 import { LandingPageOne } from '../components/ArDacityUi/LandingPageOne';
+import Leaderboard, { LeaderboardProps } from './Leaderboard';
 // TODO: Fix LandingPageOne import once package is properly configured
 // import { LandingPageOne } from '@ar-dacity/ardacity-landing-page-one';
 // import { ArdacityHeaderOne } from '@ar-dacity/ardacity-header-one';
@@ -40,7 +41,7 @@ interface BuilderProps {
   availableComponents: Component[];
 }
 
-type ComponentProps = ButtonProps | NavbarProps | HeaderProps | NavbarDarkProps | GridDistortionProps | BottomNavbarProps | StarBorderProps | WalletButtonProps | CredentialsNavbarProps | DecryptedTextProps | FlowingMenuProps;
+type ComponentProps = ButtonProps | NavbarProps | HeaderProps | NavbarDarkProps | GridDistortionProps | BottomNavbarProps | StarBorderProps | WalletButtonProps | CredentialsNavbarProps | DecryptedTextProps | FlowingMenuProps | LeaderboardProps;
 
 interface ComponentPreviewProps {
   component: Component;
@@ -326,6 +327,11 @@ end
       minPressure: 0,
       maxPressure: 1
     },
+    'leaderboard': {
+      processId: 'N_boXL20JQirhENJyfml_Geaa5cofYG8BieNA0uKZ6U',
+      title: 'AO Leaderboard',
+      limit: 10
+    },
   };
 
   const props = { ...defaultProps[component.type], ...component.props } as ComponentProps;
@@ -397,6 +403,8 @@ end
         return <ClipPathLinks {...(props as any)} />;
       case 'landing-page-one':
         return <LandingPageOne {...(props as any)} />;
+      case 'leaderboard':
+        return <Leaderboard {...(props as LeaderboardProps)} />;
       default:
         return <div>{component.name}</div>;
     }
@@ -1473,6 +1481,48 @@ const PropertiesPanel: React.FC<{
                 className="w-full p-2 border rounded-md font-mono"
                 rows={10}
               />
+            </div>
+          </>
+        );
+      case 'leaderboard':
+        return (
+          <>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Process ID
+              </label>
+              <input
+                type="text"
+                value={component.props.processId || 'N_boXL20JQirhENJyfml_Geaa5cofYG8BieNA0uKZ6U'}
+                onChange={(e) => onPropertyChange('processId', e.target.value)}
+                className="w-full p-2 border rounded-md"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Title
+              </label>
+              <input
+                type="text"
+                value={component.props.title || 'AO Leaderboard'}
+                onChange={(e) => onPropertyChange('title', e.target.value)}
+                className="w-full p-2 border rounded-md"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Default Display Limit
+              </label>
+              <select
+                className="w-full p-2 border rounded-md"
+                value={component.props.limit || 10}
+                onChange={(e) => onPropertyChange('limit', parseInt(e.target.value))}
+              >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+              </select>
             </div>
           </>
         );
